@@ -1,5 +1,5 @@
 import { createColumnHelper } from "@tanstack/react-table";
-import { Eye, PencilLine, Plus, Trash2 } from "lucide-react";
+import { Eye, PencilLine, Plus, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import AdminDataTable from "../../components/admin/AdminDataTable";
 import AppModal from "../../components/common/AppModal";
 import ConfirmModal from "../../components/common/ConfirmModal";
+import SearchableSelect from "../../components/common/SearchableSelect";
 import StatusMessage from "../../components/common/StatusMessage";
 import {
   createAdminOrder,
@@ -16,6 +17,7 @@ import {
   updateAdminOrder,
 } from "../../features/admin/adminSlice";
 import { fetchAdminProducts } from "../../features/products/productSlice";
+import useDebouncedValue from "../../hooks/useDebouncedValue";
 import { formatCurrency } from "../../utils/formatCurrency";
 
 const columnHelper = createColumnHelper();
@@ -57,6 +59,11 @@ function AdminOrdersPage() {
   const [viewOrder, setViewOrder] = useState(null);
   const [pendingDeleteOrder, setPendingDeleteOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortOption, setSortOption] = useState("newest");
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
     dispatch(fetchAdminOrders());
@@ -111,6 +118,11 @@ function AdminOrdersPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (!editingOrder && (!formData.userId || !formData.productId)) {
+      toast.error("Please select both a customer and a product.");
+      return;
+    }
 
     const payload = {
       userId: formData.userId,
@@ -179,6 +191,61 @@ function AdminOrdersPage() {
 
     return toneMap[status] || "bg-white/5 text-white/70";
   };
+
+  const filteredOrders = useMemo(() => {
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
+
+    let nextItems = orders.filter((order) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        `${order._id} ${order.user?.name || ""} ${order.user?.email || ""}`
+          .toLowerCase()
+          .includes(normalizedSearch);
+      const matchesPayment =
+        paymentFilter === "all" || order.paymentMethod === paymentFilter;
+      const matchesStatus =
+        statusFilter === "all" || order.orderStatus === statusFilter;
+
+      return matchesSearch && matchesPayment && matchesStatus;
+    });
+
+    nextItems = [...nextItems].sort((left, right) => {
+      switch (sortOption) {
+        case "oldest":
+          return new Date(left.createdAt) - new Date(right.createdAt);
+        case "total_high":
+          return right.totalPrice - left.totalPrice;
+        case "total_low":
+          return left.totalPrice - right.totalPrice;
+        default:
+          return new Date(right.createdAt) - new Date(left.createdAt);
+      }
+    });
+
+    return nextItems;
+  }, [debouncedSearch, orders, paymentFilter, sortOption, statusFilter]);
+
+  const userOptions = useMemo(
+    () =>
+      users.map((user) => ({
+        value: user._id,
+        label: `${user.name} (${user.email})`,
+        description: `${user.role} - ${user.status}${user.phone ? ` - ${user.phone}` : ""}`,
+      })),
+    [users]
+  );
+
+  const productOptions = useMemo(
+    () =>
+      adminItems.map((product) => ({
+        value: product._id,
+        label: product.name,
+        description: `${product.category} - ${product.stock} in stock - ${formatCurrency(
+          product.price
+        )}`,
+      })),
+    [adminItems]
+  );
 
   const columns = useMemo(
     () => [
@@ -292,9 +359,87 @@ function AdminOrdersPage() {
         {isLoading ? <p className="mt-2 text-sm text-white/45">Refreshing orders...</p> : null}
       </div>
 
+      <div className="panel p-4">
+        <div className="grid gap-4 xl:grid-cols-4">
+          <label className="space-y-2 xl:col-span-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <Search size={16} />
+              Search orders
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by order id, customer name, or email"
+              className="field"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <SlidersHorizontal size={16} />
+              Filter payment
+            </span>
+            <select
+              value={paymentFilter}
+              onChange={(event) => setPaymentFilter(event.target.value)}
+              className="field"
+            >
+              <option value="all">All payment methods</option>
+              <option value="cod">COD</option>
+              <option value="gcash">GCash</option>
+            </select>
+          </label>
+
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <SlidersHorizontal size={16} />
+              Filter order status
+            </span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="field"
+            >
+              <option value="all">All statuses</option>
+              {orderStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <SlidersHorizontal size={16} />
+              Sort results
+            </span>
+            <select
+              value={sortOption}
+              onChange={(event) => setSortOption(event.target.value)}
+              className="field"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="total_high">Highest total</option>
+              <option value="total_low">Lowest total</option>
+            </select>
+          </label>
+
+          <div className="flex items-end">
+            <p className="text-sm text-white/45">
+              Showing {filteredOrders.length} of {orders.length} orders
+            </p>
+          </div>
+        </div>
+      </div>
+
       <StatusMessage type="error" message={error} />
 
-      <AdminDataTable columns={columns} data={orders} emptyMessage="No orders found." />
+      <AdminDataTable columns={columns} data={filteredOrders} emptyMessage="No orders found." />
 
       <AppModal
         isOpen={isModalOpen}
@@ -307,35 +452,33 @@ function AdminOrdersPage() {
 
           {!editingOrder ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              <select
-                name="userId"
+              <SearchableSelect
+                label="Customer"
+                placeholder="Search customer by name or email"
+                options={userOptions}
                 value={formData.userId}
-                onChange={handleChange}
-                className="field"
-                required
-              >
-                <option value="">Select user</option>
-                {users.map((user) => (
-                  <option key={user._id} value={user._id}>
-                    {user.name} ({user.email})
-                  </option>
-                ))}
-              </select>
+                onChange={(value) =>
+                  setFormData((current) => ({
+                    ...current,
+                    userId: value,
+                  }))
+                }
+                emptyMessage="No matching users found."
+              />
 
-              <select
-                name="productId"
+              <SearchableSelect
+                label="Product"
+                placeholder="Search product by name or category"
+                options={productOptions}
                 value={formData.productId}
-                onChange={handleChange}
-                className="field"
-                required
-              >
-                <option value="">Select product</option>
-                {adminItems.map((product) => (
-                  <option key={product._id} value={product._id}>
-                    {product.name} ({product.stock} in stock)
-                  </option>
-                ))}
-              </select>
+                onChange={(value) =>
+                  setFormData((current) => ({
+                    ...current,
+                    productId: value,
+                  }))
+                }
+                emptyMessage="No matching products found."
+              />
             </div>
           ) : (
             <div className="panel-muted p-4 text-sm text-white/70">
@@ -345,140 +488,179 @@ function AdminOrdersPage() {
           )}
 
           {!editingOrder ? (
-            <input
-              type="number"
-              min="1"
-              name="quantity"
-              value={formData.quantity}
-              onChange={handleChange}
-              placeholder="Quantity"
-              className="field"
-              required
-            />
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">Quantity</span>
+              <input
+                type="number"
+                min="1"
+                name="quantity"
+                value={formData.quantity}
+                onChange={handleChange}
+                placeholder="Enter order quantity"
+                className="field"
+                required
+              />
+            </label>
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <input
-              name="fullName"
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="Receiver name"
-              className="field"
-              required
-            />
-            <input
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="Receiver phone"
-              className="field"
-              required
-            />
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">Receiver name</span>
+              <input
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                placeholder="Enter receiver full name"
+                className="field"
+                required
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">Receiver phone</span>
+              <input
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Enter receiver phone number"
+                className="field"
+                required
+              />
+            </label>
           </div>
 
-          <input
-            name="street"
-            value={formData.street}
-            onChange={handleChange}
-            placeholder="Street address"
-            className="field"
-            required
-          />
-
-          <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block space-y-2">
+            <span className="text-sm font-semibold text-white/80">Street address</span>
             <input
-              name="city"
-              value={formData.city}
+              name="street"
+              value={formData.street}
               onChange={handleChange}
-              placeholder="City"
+              placeholder="Enter street address"
               className="field"
               required
             />
-            <input
-              name="state"
-              value={formData.state}
-              onChange={handleChange}
-              placeholder="State / Province"
-              className="field"
-            />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">City</span>
+              <input
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                placeholder="Enter city"
+                className="field"
+                required
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">State / Province</span>
+              <input
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                placeholder="Enter state or province"
+                className="field"
+              />
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <input
-              name="postalCode"
-              value={formData.postalCode}
-              onChange={handleChange}
-              placeholder="Postal code"
-              className="field"
-            />
-            <input
-              name="country"
-              value={formData.country}
-              onChange={handleChange}
-              placeholder="Country"
-              className="field"
-            />
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">Postal code</span>
+              <input
+                name="postalCode"
+                value={formData.postalCode}
+                onChange={handleChange}
+                placeholder="Enter postal code"
+                className="field"
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">Country</span>
+              <input
+                name="country"
+                value={formData.country}
+                onChange={handleChange}
+                placeholder="Enter country"
+                className="field"
+              />
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <select
-              name="paymentMethod"
-              value={formData.paymentMethod}
-              onChange={handleChange}
-              className="field"
-            >
-              {paymentMethods.map((method) => (
-                <option key={method} value={method}>
-                  {method.toUpperCase()}
-                </option>
-              ))}
-            </select>
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">Payment method</span>
+              <select
+                name="paymentMethod"
+                value={formData.paymentMethod}
+                onChange={handleChange}
+                className="field"
+              >
+                {paymentMethods.map((method) => (
+                  <option key={method} value={method}>
+                    {method.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-            <select
-              name="paymentStatus"
-              value={formData.paymentStatus}
-              onChange={handleChange}
-              className="field"
-            >
-              {paymentStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">Payment status</span>
+              <select
+                name="paymentStatus"
+                value={formData.paymentStatus}
+                onChange={handleChange}
+                className="field"
+              >
+                {paymentStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-            <select
-              name="orderStatus"
-              value={formData.orderStatus}
-              onChange={handleChange}
-              className="field"
-            >
-              {orderStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">Order status</span>
+              <select
+                name="orderStatus"
+                value={formData.orderStatus}
+                onChange={handleChange}
+                className="field"
+              >
+                {orderStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {formData.paymentMethod === "gcash" ? (
-            <input
-              name="gcashReference"
-              value={formData.gcashReference}
-              onChange={handleChange}
-              placeholder="GCash reference"
-              className="field"
-            />
+            <label className="block space-y-2">
+              <span className="text-sm font-semibold text-white/80">GCash reference</span>
+              <input
+                name="gcashReference"
+                value={formData.gcashReference}
+                onChange={handleChange}
+                placeholder="Enter GCash reference"
+                className="field"
+              />
+            </label>
           ) : null}
 
-          <textarea
-            name="notes"
-            value={formData.notes}
-            onChange={handleChange}
-            rows="4"
-            placeholder="Notes"
-            className="field"
-          />
+          <label className="block space-y-2">
+            <span className="text-sm font-semibold text-white/80">Notes</span>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              rows="4"
+              placeholder="Add any internal note or delivery instruction"
+              className="field"
+            />
+          </label>
 
           <div className="flex justify-end gap-3">
             <button type="button" onClick={closeModal} className="btn-secondary">

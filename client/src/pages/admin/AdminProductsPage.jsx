@@ -1,5 +1,5 @@
 import { createColumnHelper } from "@tanstack/react-table";
-import { ImagePlus, PencilLine, Plus, Trash2 } from "lucide-react";
+import { ImagePlus, PencilLine, Plus, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
@@ -15,6 +15,7 @@ import {
   fetchAdminProducts,
   updateProduct,
 } from "../../features/products/productSlice";
+import useDebouncedValue from "../../hooks/useDebouncedValue";
 import { formatCurrency } from "../../utils/formatCurrency";
 
 const initialFormState = {
@@ -41,6 +42,10 @@ function AdminProductsPage() {
   const [editingProductId, setEditingProductId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortOption, setSortOption] = useState("newest");
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
     dispatch(fetchAdminProducts());
@@ -155,6 +160,43 @@ function AdminProductsPage() {
     []
   );
 
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
+
+    let nextItems = adminItems.filter((product) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        `${product.name} ${product.brand} ${product.category}`
+          .toLowerCase()
+          .includes(normalizedSearch);
+
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "published" && product.isPublished) ||
+        (statusFilter === "draft" && !product.isPublished) ||
+        (statusFilter === "featured" && product.isFeatured);
+
+      return matchesSearch && matchesStatus;
+    });
+
+    nextItems = [...nextItems].sort((left, right) => {
+      switch (sortOption) {
+        case "price_high":
+          return right.price - left.price;
+        case "price_low":
+          return left.price - right.price;
+        case "stock_high":
+          return right.stock - left.stock;
+        case "name_az":
+          return left.name.localeCompare(right.name);
+        default:
+          return new Date(right.createdAt) - new Date(left.createdAt);
+      }
+    });
+
+    return nextItems;
+  }, [adminItems, debouncedSearch, sortOption, statusFilter]);
+
   const handleChange = (event) => {
     const { name, value, checked, type } = event.target;
     setFormData((current) => ({
@@ -228,9 +270,66 @@ function AdminProductsPage() {
         {adminLoading ? <p className="mt-2 text-sm text-white/45">Refreshing...</p> : null}
       </div>
 
+      <div className="panel p-4">
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr_0.8fr]">
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <Search size={16} />
+              Search products
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by name, brand, or category"
+              className="field"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <SlidersHorizontal size={16} />
+              Filter status
+            </span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="field"
+            >
+              <option value="all">All products</option>
+              <option value="published">Published</option>
+              <option value="draft">Draft</option>
+              <option value="featured">Featured</option>
+            </select>
+          </label>
+
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <SlidersHorizontal size={16} />
+              Sort results
+            </span>
+            <select
+              value={sortOption}
+              onChange={(event) => setSortOption(event.target.value)}
+              className="field"
+            >
+              <option value="newest">Newest first</option>
+              <option value="name_az">Name A-Z</option>
+              <option value="price_high">Price high to low</option>
+              <option value="price_low">Price low to high</option>
+              <option value="stock_high">Highest stock</option>
+            </select>
+          </label>
+        </div>
+
+        <p className="mt-3 text-sm text-white/45">
+          Showing {filteredProducts.length} of {adminItems.length} products
+        </p>
+      </div>
+
       <StatusMessage type="error" message={adminError || error} />
 
-      <AdminDataTable columns={columns} data={adminItems} emptyMessage="No products found yet." />
+      <AdminDataTable columns={columns} data={filteredProducts} emptyMessage="No products found yet." />
 
       <AppModal
         isOpen={isModalOpen}

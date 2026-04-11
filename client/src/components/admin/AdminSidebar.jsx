@@ -18,7 +18,7 @@ function AdminSidebar() {
     <aside className="flex h-full flex-col rounded-[10px] bg-surface-sidebar px-5 py-6 text-white">
       <div className="mb-10">
         <p className="text-xs font-semibold uppercase tracking-[0.35em] text-white/60">
-          Control Room
+          ROWELL'S AREA
         </p>
         <h2 className="mt-3 text-2xl font-black">haker-ecommerce</h2>
       </div>

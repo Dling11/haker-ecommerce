@@ -178,10 +178,10 @@ function AdminDashboardPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <span className="rounded-full bg-white px-3 py-1 font-semibold text-ink-700">
+                <span className="rounded-full bg-white px-3 py-1 font-semibold text-stone-900">
                   {order.orderStatus.replaceAll("_", " ")}
                 </span>
-                <span className="rounded-full bg-brand-50 px-3 py-1 font-semibold text-brand-700">
+                <span className="rounded-full bg-brand-50 px-3 py-1 font-semibold text-green-800">
                   {formatCurrency(order.totalPrice)}
                 </span>
               </div>

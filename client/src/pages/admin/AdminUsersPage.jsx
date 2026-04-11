@@ -5,7 +5,9 @@ import {
   LoaderCircle,
   PencilLine,
   Plus,
+  Search,
   ShieldAlert,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +26,7 @@ import {
   updateUserManagement,
   uploadAdminImage,
 } from "../../features/admin/adminSlice";
+import useDebouncedValue from "../../hooks/useDebouncedValue";
 
 const columnHelper = createColumnHelper();
 
@@ -55,7 +58,12 @@ function AdminUsersPage() {
   const [viewUser, setViewUser] = useState(null);
   const [pendingDeleteUser, setPendingDeleteUser] = useState(null);
   const [pendingRoleChange, setPendingRoleChange] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortOption, setSortOption] = useState("newest");
   const currentEditingUser = users.find((user) => user._id === editingUserId);
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
     dispatch(fetchUsers());
@@ -315,6 +323,33 @@ function AdminUsersPage() {
     []
   );
 
+  const filteredUsers = useMemo(() => {
+    const normalizedSearch = debouncedSearch.trim().toLowerCase();
+
+    let nextItems = users.filter((user) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        `${user.name} ${user.email} ${user.phone || ""}`.toLowerCase().includes(normalizedSearch);
+      const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      const matchesStatus = statusFilter === "all" || user.status === statusFilter;
+
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+
+    nextItems = [...nextItems].sort((left, right) => {
+      switch (sortOption) {
+        case "name_az":
+          return left.name.localeCompare(right.name);
+        case "email_az":
+          return left.email.localeCompare(right.email);
+        default:
+          return new Date(right.createdAt) - new Date(left.createdAt);
+      }
+    });
+
+    return nextItems;
+  }, [debouncedSearch, roleFilter, sortOption, statusFilter, users]);
+
   return (
     <section className="space-y-4">
       <div className="panel p-6">
@@ -336,9 +371,84 @@ function AdminUsersPage() {
         {isLoading ? <p className="mt-2 text-sm text-white/45">Refreshing users...</p> : null}
       </div>
 
+      <div className="panel p-4">
+        <div className="grid gap-4 xl:grid-cols-4">
+          <label className="space-y-2 xl:col-span-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <Search size={16} />
+              Search users
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by name, email, or phone"
+              className="field"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <SlidersHorizontal size={16} />
+              Filter role
+            </span>
+            <select
+              value={roleFilter}
+              onChange={(event) => setRoleFilter(event.target.value)}
+              className="field"
+            >
+              <option value="all">All roles</option>
+              <option value="customer">Customer</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <SlidersHorizontal size={16} />
+              Filter status
+            </span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="field"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="banned">Banned</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
+          <label className="space-y-2">
+            <span className="inline-flex items-center gap-2 text-sm font-semibold text-white/75">
+              <SlidersHorizontal size={16} />
+              Sort results
+            </span>
+            <select
+              value={sortOption}
+              onChange={(event) => setSortOption(event.target.value)}
+              className="field"
+            >
+              <option value="newest">Newest first</option>
+              <option value="name_az">Name A-Z</option>
+              <option value="email_az">Email A-Z</option>
+            </select>
+          </label>
+
+          <div className="flex items-end">
+            <p className="text-sm text-white/45">
+              Showing {filteredUsers.length} of {users.length} users
+            </p>
+          </div>
+        </div>
+      </div>
+
       <StatusMessage type="error" message={error} />
 
-      <AdminDataTable columns={columns} data={users} emptyMessage="No users found." />
+      <AdminDataTable columns={columns} data={filteredUsers} emptyMessage="No users found." />
 
       <AppModal
         isOpen={isFormModalOpen}
