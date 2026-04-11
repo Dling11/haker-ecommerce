@@ -59,6 +59,7 @@ function AdminOrdersPage() {
   const [viewOrder, setViewOrder] = useState(null);
   const [pendingDeleteOrder, setPendingDeleteOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -167,6 +168,7 @@ function AdminOrdersPage() {
   };
 
   const confirmDelete = async () => {
+    setIsDeletingOrder(true);
     const result = await dispatch(deleteAdminOrder(pendingDeleteOrder._id));
 
     if (deleteAdminOrder.fulfilled.match(result)) {
@@ -175,6 +177,8 @@ function AdminOrdersPage() {
     } else {
       toast.error(result.payload || "Failed to delete order.");
     }
+
+    setIsDeletingOrder(false);
   };
 
   const statusClassName = (status) => {
@@ -747,6 +751,8 @@ function AdminOrdersPage() {
         title="Delete order?"
         description={`This will permanently remove order #${pendingDeleteOrder?._id?.slice(-6)?.toUpperCase() || ""}. Stock will be restored for its items.`}
         confirmLabel="Delete order"
+        loadingLabel="Deleting..."
+        isLoading={isDeletingOrder}
       />
     </section>
   );

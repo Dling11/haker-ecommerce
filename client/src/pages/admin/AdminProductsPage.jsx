@@ -27,6 +27,7 @@ const initialFormState = {
   comparePrice: "",
   stock: "",
   imageUrl: "",
+  imagePublicId: "",
   isFeatured: false,
   isPublished: true,
 };
@@ -42,6 +43,7 @@ function AdminProductsPage() {
   const [editingProductId, setEditingProductId] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOption, setSortOption] = useState("newest");
@@ -56,6 +58,7 @@ function AdminProductsPage() {
       setFormData((current) => ({
         ...current,
         imageUrl: uploadedImage.url,
+        imagePublicId: uploadedImage.publicId,
       }));
       toast.success("Image uploaded successfully.");
       dispatch(clearUploadedImage());
@@ -88,6 +91,7 @@ function AdminProductsPage() {
       comparePrice: product.comparePrice,
       stock: product.stock,
       imageUrl: product.images?.[0]?.url || "",
+      imagePublicId: product.images?.[0]?.publicId || "",
       isFeatured: product.isFeatured,
       isPublished: product.isPublished,
     });
@@ -228,7 +232,7 @@ function AdminProductsPage() {
       stock: Number(formData.stock),
       isFeatured: formData.isFeatured,
       isPublished: formData.isPublished,
-      images: [{ url: formData.imageUrl }],
+      images: [{ url: formData.imageUrl, publicId: formData.imagePublicId || "" }],
     };
 
     const result = editingProductId
@@ -243,12 +247,17 @@ function AdminProductsPage() {
   };
 
   const confirmDelete = async () => {
+    setIsDeletingProduct(true);
     const result = await dispatch(deleteProduct(productToDelete._id));
 
     if (deleteProduct.fulfilled.match(result)) {
       toast.success("Product deleted.");
       setProductToDelete(null);
+    } else {
+      toast.error(result.payload || "Failed to delete product.");
     }
+
+    setIsDeletingProduct(false);
   };
 
   return (
@@ -393,6 +402,8 @@ function AdminProductsPage() {
         title="Delete product?"
         description={`This will permanently remove ${productToDelete?.name || "this product"} from the catalog.`}
         confirmLabel="Delete product"
+        loadingLabel="Deleting..."
+        isLoading={isDeletingProduct}
       />
     </section>
   );

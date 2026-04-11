@@ -38,6 +38,7 @@ const initialFormState = {
   role: "customer",
   status: "active",
   avatar: "",
+  avatarPublicId: "",
   fullName: "",
   shippingPhone: "",
   street: "",
@@ -58,6 +59,8 @@ function AdminUsersPage() {
   const [viewUser, setViewUser] = useState(null);
   const [pendingDeleteUser, setPendingDeleteUser] = useState(null);
   const [pendingRoleChange, setPendingRoleChange] = useState(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -74,6 +77,7 @@ function AdminUsersPage() {
       setFormData((current) => ({
         ...current,
         avatar: uploadedImage.url,
+        avatarPublicId: uploadedImage.publicId,
       }));
       toast.success("Profile image uploaded.");
       dispatch(clearUploadedImage());
@@ -105,6 +109,7 @@ function AdminUsersPage() {
       role: user.role || "customer",
       status: user.status || "active",
       avatar: user.avatar?.url || "",
+      avatarPublicId: user.avatar?.publicId || "",
       fullName: user.shippingAddress?.fullName || "",
       shippingPhone: user.shippingAddress?.phone || "",
       street: user.shippingAddress?.street || "",
@@ -149,7 +154,7 @@ function AdminUsersPage() {
     status: formData.status,
     avatar: {
       url: formData.avatar,
-      publicId: "",
+      publicId: formData.avatarPublicId || "",
     },
     shippingAddress: {
       fullName: formData.fullName,
@@ -189,6 +194,7 @@ function AdminUsersPage() {
   };
 
   const confirmDelete = async () => {
+    setIsDeletingUser(true);
     const result = await dispatch(deleteAdminUser(pendingDeleteUser._id));
 
     if (deleteAdminUser.fulfilled.match(result)) {
@@ -197,9 +203,12 @@ function AdminUsersPage() {
     } else {
       toast.error(result.payload || "Failed to delete user.");
     }
+
+    setIsDeletingUser(false);
   };
 
   const confirmRoleChange = async () => {
+    setIsUpdatingRole(true);
     const result = await dispatch(updateUserManagement(pendingRoleChange));
 
     if (updateUserManagement.fulfilled.match(result)) {
@@ -211,6 +220,8 @@ function AdminUsersPage() {
     } else {
       toast.error(result.payload || "Failed to update role.");
     }
+
+    setIsUpdatingRole(false);
   };
 
   const columns = useMemo(
@@ -680,6 +691,8 @@ function AdminUsersPage() {
             : `This will permanently remove ${pendingDeleteUser?.name || "this user"} from the system.`
         }
         confirmLabel="Delete user"
+        loadingLabel="Deleting..."
+        isLoading={isDeletingUser}
       />
 
       <ConfirmModal
@@ -690,6 +703,8 @@ function AdminUsersPage() {
         title="Change user role?"
         description={`You are about to change ${pendingRoleChange?.name || "this user"} to ${pendingRoleChange?.role || "a different role"}. This is a sensitive action.`}
         confirmLabel="Update role"
+        loadingLabel="Updating..."
+        isLoading={isUpdatingRole}
       />
     </section>
   );

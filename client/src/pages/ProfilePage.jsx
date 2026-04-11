@@ -17,6 +17,7 @@ function ProfilePage() {
     phone: user?.phone || "",
     password: "",
     avatar: user?.avatar?.url || "",
+    avatarPublicId: user?.avatar?.publicId || "",
     fullName: user?.shippingAddress?.fullName || "",
     shippingPhone: user?.shippingAddress?.phone || "",
     street: user?.shippingAddress?.street || "",
@@ -55,6 +56,7 @@ function ProfilePage() {
       setFormData((current) => ({
         ...current,
         avatar: data.image.url,
+        avatarPublicId: data.image.publicId,
       }));
       toast.success("Profile image uploaded.");
     } catch (uploadError) {
@@ -73,7 +75,7 @@ function ProfilePage() {
         password: formData.password || undefined,
         avatar: {
           url: formData.avatar,
-          publicId: user?.avatar?.publicId || "",
+          publicId: formData.avatarPublicId || "",
         },
         shippingAddress: {
           fullName: formData.fullName,

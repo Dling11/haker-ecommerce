@@ -1,5 +1,6 @@
 const Product = require("../models/Product");
 const asyncHandler = require("../utils/asyncHandler");
+const { deleteCloudinaryImage } = require("../utils/cloudinaryAsset");
 
 const buildSlug = (value) =>
   value
@@ -114,6 +115,12 @@ const updateProduct = asyncHandler(async (req, res) => {
   }
 
   const updates = { ...req.body };
+  const currentImagePublicIds = (product.images || [])
+    .map((image) => image.publicId)
+    .filter(Boolean);
+  const nextImagePublicIds = (req.body.images || [])
+    .map((image) => image.publicId)
+    .filter(Boolean);
 
   if (req.body.name) {
     updates.slug = buildSlug(req.body.name);
@@ -123,6 +130,12 @@ const updateProduct = asyncHandler(async (req, res) => {
     new: true,
     runValidators: true,
   });
+
+  const removedImagePublicIds = currentImagePublicIds.filter(
+    (publicId) => !nextImagePublicIds.includes(publicId)
+  );
+
+  await Promise.all(removedImagePublicIds.map(deleteCloudinaryImage));
 
   res.status(200).json({
     success: true,
@@ -139,7 +152,12 @@ const deleteProduct = asyncHandler(async (req, res) => {
     throw new Error("Product not found.");
   }
 
+  const imagePublicIds = (product.images || [])
+    .map((image) => image.publicId)
+    .filter(Boolean);
+
   await product.deleteOne();
+  await Promise.all(imagePublicIds.map(deleteCloudinaryImage));
 
   res.status(200).json({
     success: true,

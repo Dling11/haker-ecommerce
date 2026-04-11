@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
+const { deleteCloudinaryImage } = require("../utils/cloudinaryAsset");
 
 const getUsers = asyncHandler(async (req, res) => {
   const users = await User.find({}).select("-password").sort({ createdAt: -1 });
@@ -65,6 +66,8 @@ const updateUserManagement = asyncHandler(async (req, res) => {
     throw new Error("User not found.");
   }
 
+  const previousAvatarPublicId = user.avatar?.publicId || "";
+
   if (email && email.toLowerCase() !== user.email) {
     const existingUser = await User.findOne({ email: email.toLowerCase(), _id: { $ne: user._id } });
 
@@ -108,6 +111,15 @@ const updateUserManagement = asyncHandler(async (req, res) => {
 
   await user.save();
 
+  if (
+    previousAvatarPublicId &&
+    avatar &&
+    avatar.publicId &&
+    avatar.publicId !== previousAvatarPublicId
+  ) {
+    await deleteCloudinaryImage(previousAvatarPublicId);
+  }
+
   if (password) {
     const passwordHash = await bcrypt.hash(password, 10);
     await User.findByIdAndUpdate(user._id, { password: passwordHash });
@@ -135,7 +147,13 @@ const deleteUser = asyncHandler(async (req, res) => {
     throw new Error("Admin users cannot be deleted.");
   }
 
+  const avatarPublicId = user.avatar?.publicId || "";
+
   await user.deleteOne();
+
+  if (avatarPublicId) {
+    await deleteCloudinaryImage(avatarPublicId);
+  }
 
   res.status(200).json({
     success: true,

@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const asyncHandler = require("../utils/asyncHandler");
+const { deleteCloudinaryImage } = require("../utils/cloudinaryAsset");
 
 const buildUserPayload = (user) => ({
   _id: user._id,
@@ -107,6 +108,8 @@ const updateProfile = asyncHandler(async (req, res) => {
     throw new Error("User not found.");
   }
 
+  const previousAvatarPublicId = user.avatar?.publicId || "";
+
   user.name = req.body.name || user.name;
   user.phone = req.body.phone ?? user.phone;
   user.avatar = req.body.avatar || user.avatar;
@@ -120,6 +123,14 @@ const updateProfile = asyncHandler(async (req, res) => {
   }
 
   await user.save();
+
+  if (
+    previousAvatarPublicId &&
+    req.body.avatar?.publicId &&
+    req.body.avatar.publicId !== previousAvatarPublicId
+  ) {
+    await deleteCloudinaryImage(previousAvatarPublicId);
+  }
 
   res.status(200).json({
     success: true,
