@@ -62,6 +62,7 @@ const initialState = {
     items: [],
     itemsPrice: 0,
   },
+  isDrawerOpen: false,
   isLoading: false,
   error: null,
 };
@@ -72,8 +73,18 @@ const cartSlice = createSlice({
   reducers: {
     resetCartState: (state) => {
       state.cart = { items: [], itemsPrice: 0 };
+      state.isDrawerOpen = false;
       state.isLoading = false;
       state.error = null;
+    },
+    openCartDrawer: (state) => {
+      state.isDrawerOpen = true;
+    },
+    closeCartDrawer: (state) => {
+      state.isDrawerOpen = false;
+    },
+    toggleCartDrawer: (state) => {
+      state.isDrawerOpen = !state.isDrawerOpen;
     },
   },
   extraReducers: (builder) => {
@@ -105,5 +116,6 @@ const cartSlice = createSlice({
   },
 });
 
-export const { resetCartState } = cartSlice.actions;
+export const { resetCartState, openCartDrawer, closeCartDrawer, toggleCartDrawer } =
+  cartSlice.actions;
 export default cartSlice.reducer;
