@@ -17,10 +17,34 @@ export const fetchProducts = createAsyncThunk(
 
 export const fetchAdminProducts = createAsyncThunk(
   "products/fetchAdminProducts",
-  async (_, thunkAPI) => {
+  async (params = {}, thunkAPI) => {
     try {
-      const { data } = await api.get("/products/admin");
-      return data.products;
+      const { data } = await api.get("/products/admin", { params });
+      return data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const fetchProductDetails = createAsyncThunk(
+  "products/fetchProductDetails",
+  async (productId, thunkAPI) => {
+    try {
+      const { data } = await api.get(`/products/${productId}`);
+      return data.product;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const createProductReview = createAsyncThunk(
+  "products/createProductReview",
+  async ({ productId, rating, comment }, thunkAPI) => {
+    try {
+      const { data } = await api.post(`/products/${productId}/reviews`, { rating, comment });
+      return data.product;
     } catch (error) {
       return thunkAPI.rejectWithValue(getErrorMessage(error));
     }
@@ -68,6 +92,10 @@ const initialState = {
   categories: [],
   adminItems: [],
   pagination: null,
+  adminPagination: null,
+  selectedProduct: null,
+  detailLoading: false,
+  reviewLoading: false,
   isLoading: false,
   adminLoading: false,
   error: null,
@@ -100,7 +128,8 @@ const productSlice = createSlice({
       })
       .addCase(fetchAdminProducts.fulfilled, (state, action) => {
         state.adminLoading = false;
-        state.adminItems = action.payload;
+        state.adminItems = action.payload.products;
+        state.adminPagination = action.payload.pagination;
       })
       .addCase(fetchAdminProducts.rejected, (state, action) => {
         state.adminLoading = false;
@@ -122,6 +151,33 @@ const productSlice = createSlice({
           (product) => product._id !== action.payload
         );
         state.items = state.items.filter((product) => product._id !== action.payload);
+      })
+      .addCase(fetchProductDetails.pending, (state) => {
+        state.detailLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchProductDetails.fulfilled, (state, action) => {
+        state.detailLoading = false;
+        state.selectedProduct = action.payload;
+      })
+      .addCase(fetchProductDetails.rejected, (state, action) => {
+        state.detailLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(createProductReview.pending, (state) => {
+        state.reviewLoading = true;
+        state.error = null;
+      })
+      .addCase(createProductReview.fulfilled, (state, action) => {
+        state.reviewLoading = false;
+        state.selectedProduct = action.payload;
+        state.items = state.items.map((product) =>
+          product._id === action.payload._id ? action.payload : product
+        );
+      })
+      .addCase(createProductReview.rejected, (state, action) => {
+        state.reviewLoading = false;
+        state.error = action.payload;
       });
   },
 });

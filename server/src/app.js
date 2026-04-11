@@ -11,6 +11,7 @@ const cartRoutes = require("./routes/cartRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const userRoutes = require("./routes/userRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
 const notFound = require("./middleware/notFound");
 const errorMiddleware = require("./middleware/errorMiddleware");
 
@@ -41,6 +42,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/uploads", uploadRoutes);
+app.use("/api/categories", categoryRoutes);
 
 app.use(notFound);
 app.use(errorMiddleware);

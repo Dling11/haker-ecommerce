@@ -25,8 +25,13 @@ router.post(
   adminOnly,
   [
     body("userId").isMongoId().withMessage("A valid user id is required."),
-    body("productId").isMongoId().withMessage("A valid product id is required."),
-    body("quantity").isInt({ min: 1 }).withMessage("Quantity must be at least 1."),
+    body("orderItems").isArray({ min: 1 }).withMessage("At least one order item is required."),
+    body("orderItems.*.productId")
+      .isMongoId()
+      .withMessage("A valid product id is required for each order item."),
+    body("orderItems.*.quantity")
+      .isInt({ min: 1 })
+      .withMessage("Each order item quantity must be at least 1."),
     body("shippingAddress.fullName").notEmpty().withMessage("Full name is required."),
     body("shippingAddress.phone").notEmpty().withMessage("Phone number is required."),
     body("shippingAddress.street").notEmpty().withMessage("Street is required."),

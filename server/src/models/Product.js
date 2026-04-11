@@ -8,6 +8,22 @@ const imageSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const reviewSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    name: { type: String, required: true, trim: true },
+    rating: { type: Number, required: true, min: 1, max: 5 },
+    comment: { type: String, required: true, trim: true, maxlength: 1000 },
+  },
+  {
+    timestamps: true,
+  }
+);
+
 const productSchema = new mongoose.Schema(
   {
     name: {
@@ -60,6 +76,10 @@ const productSchema = new mongoose.Schema(
         validator: (value) => value.length > 0,
         message: "At least one product image is required",
       },
+    },
+    reviews: {
+      type: [reviewSchema],
+      default: [],
     },
     rating: { type: Number, min: 0, max: 5, default: 0 },
     numReviews: { type: Number, min: 0, default: 0 },

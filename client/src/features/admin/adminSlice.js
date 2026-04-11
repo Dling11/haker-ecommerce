@@ -15,10 +15,10 @@ export const fetchDashboardStats = createAsyncThunk(
   }
 );
 
-export const fetchUsers = createAsyncThunk("admin/fetchUsers", async (_, thunkAPI) => {
+export const fetchUsers = createAsyncThunk("admin/fetchUsers", async (params = {}, thunkAPI) => {
   try {
-    const { data } = await api.get("/users");
-    return data.users;
+    const { data } = await api.get("/users", { params });
+    return data;
   } catch (error) {
     return thunkAPI.rejectWithValue(getErrorMessage(error));
   }
@@ -62,10 +62,10 @@ export const deleteAdminUser = createAsyncThunk(
 
 export const fetchAdminOrders = createAsyncThunk(
   "admin/fetchAdminOrders",
-  async (_, thunkAPI) => {
+  async (params = {}, thunkAPI) => {
     try {
-      const { data } = await api.get("/orders/admin");
-      return data.orders;
+      const { data } = await api.get("/orders/admin", { params });
+      return data;
     } catch (error) {
       return thunkAPI.rejectWithValue(getErrorMessage(error));
     }
@@ -147,7 +147,9 @@ export const uploadAdminImage = createAsyncThunk(
 const initialState = {
   stats: null,
   users: [],
+  usersPagination: null,
   orders: [],
+  ordersPagination: null,
   isLoading: false,
   error: null,
   uploadLoading: false,
@@ -170,7 +172,8 @@ const adminSlice = createSlice({
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.users = action.payload;
+        state.users = action.payload.users;
+        state.usersPagination = action.payload.pagination;
       })
       .addCase(createAdminUser.fulfilled, (state, action) => {
         state.isLoading = false;
@@ -188,7 +191,8 @@ const adminSlice = createSlice({
       })
       .addCase(fetchAdminOrders.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.orders = action.payload;
+        state.orders = action.payload.orders;
+        state.ordersPagination = action.payload.pagination;
       })
       .addCase(createAdminOrder.fulfilled, (state, action) => {
         state.isLoading = false;

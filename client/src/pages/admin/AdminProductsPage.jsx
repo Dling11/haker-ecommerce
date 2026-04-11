@@ -7,8 +7,10 @@ import toast from "react-hot-toast";
 import AdminDataTable from "../../components/admin/AdminDataTable";
 import AppModal from "../../components/common/AppModal";
 import ConfirmModal from "../../components/common/ConfirmModal";
+import PaginationControls from "../../components/common/PaginationControls";
 import StatusMessage from "../../components/common/StatusMessage";
 import { clearUploadedImage, uploadAdminImage } from "../../features/admin/adminSlice";
+import { fetchCategories } from "../../features/categories/categorySlice";
 import {
   createProduct,
   deleteProduct,
@@ -36,7 +38,8 @@ const columnHelper = createColumnHelper();
 
 function AdminProductsPage() {
   const dispatch = useDispatch();
-  const { adminItems, adminLoading, adminError } = useSelector((state) => state.products);
+  const { adminItems, adminLoading, adminError, adminPagination } = useSelector((state) => state.products);
+  const { items: categories } = useSelector((state) => state.categories);
   const { uploadLoading, uploadedImage, error } = useSelector((state) => state.admin);
 
   const [formData, setFormData] = useState(initialFormState);
@@ -47,11 +50,23 @@ function AdminProductsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOption, setSortOption] = useState("newest");
+  const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
-    dispatch(fetchAdminProducts());
+    dispatch(fetchCategories());
   }, [dispatch]);
+
+  useEffect(() => {
+    dispatch(
+      fetchAdminProducts({
+        keyword: debouncedSearch,
+        status: statusFilter,
+        sort: sortOption,
+        page,
+      })
+    );
+  }, [debouncedSearch, dispatch, page, sortOption, statusFilter]);
 
   useEffect(() => {
     if (uploadedImage?.url) {
@@ -164,43 +179,6 @@ function AdminProductsPage() {
     []
   );
 
-  const filteredProducts = useMemo(() => {
-    const normalizedSearch = debouncedSearch.trim().toLowerCase();
-
-    let nextItems = adminItems.filter((product) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        `${product.name} ${product.brand} ${product.category}`
-          .toLowerCase()
-          .includes(normalizedSearch);
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "published" && product.isPublished) ||
-        (statusFilter === "draft" && !product.isPublished) ||
-        (statusFilter === "featured" && product.isFeatured);
-
-      return matchesSearch && matchesStatus;
-    });
-
-    nextItems = [...nextItems].sort((left, right) => {
-      switch (sortOption) {
-        case "price_high":
-          return right.price - left.price;
-        case "price_low":
-          return left.price - right.price;
-        case "stock_high":
-          return right.stock - left.stock;
-        case "name_az":
-          return left.name.localeCompare(right.name);
-        default:
-          return new Date(right.createdAt) - new Date(left.createdAt);
-      }
-    });
-
-    return nextItems;
-  }, [adminItems, debouncedSearch, sortOption, statusFilter]);
-
   const handleChange = (event) => {
     const { name, value, checked, type } = event.target;
     setFormData((current) => ({
@@ -242,7 +220,6 @@ function AdminProductsPage() {
     if (updateProduct.fulfilled.match(result) || createProduct.fulfilled.match(result)) {
       toast.success(editingProductId ? "Product updated." : "Product created.");
       closeModal();
-      dispatch(fetchAdminProducts());
     }
   };
 
@@ -289,7 +266,10 @@ function AdminProductsPage() {
             <input
               type="text"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(1);
+              }}
               placeholder="Search by name, brand, or category"
               className="field"
             />
@@ -302,7 +282,10 @@ function AdminProductsPage() {
             </span>
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
               className="field"
             >
               <option value="all">All products</option>
@@ -319,7 +302,10 @@ function AdminProductsPage() {
             </span>
             <select
               value={sortOption}
-              onChange={(event) => setSortOption(event.target.value)}
+              onChange={(event) => {
+                setSortOption(event.target.value);
+                setPage(1);
+              }}
               className="field"
             >
               <option value="newest">Newest first</option>
@@ -332,13 +318,14 @@ function AdminProductsPage() {
         </div>
 
         <p className="mt-3 text-sm text-white/45">
-          Showing {filteredProducts.length} of {adminItems.length} products
+          Showing {adminItems.length} products on this page
         </p>
       </div>
 
       <StatusMessage type="error" message={adminError || error} />
 
-      <AdminDataTable columns={columns} data={filteredProducts} emptyMessage="No products found yet." />
+      <AdminDataTable columns={columns} data={adminItems} emptyMessage="No products found yet." />
+      <PaginationControls pagination={adminPagination} onPageChange={setPage} />
 
       <AppModal
         isOpen={isModalOpen}
@@ -352,7 +339,14 @@ function AdminProductsPage() {
           <textarea name="description" value={formData.description} onChange={handleChange} rows="4" placeholder="Description" className="field" required />
           <div className="grid gap-4 sm:grid-cols-2">
             <input name="brand" value={formData.brand} onChange={handleChange} placeholder="Brand" className="field" />
-            <input name="category" value={formData.category} onChange={handleChange} placeholder="Category" className="field" required />
+            <select name="category" value={formData.category} onChange={handleChange} className="field" required>
+              <option value="">Select category</option>
+              {categories.map((category) => (
+                <option key={category._id} value={category.name}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder="Price" className="field" required />

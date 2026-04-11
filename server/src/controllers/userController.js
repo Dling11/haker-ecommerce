@@ -5,11 +5,61 @@ const asyncHandler = require("../utils/asyncHandler");
 const { deleteCloudinaryImage } = require("../utils/cloudinaryAsset");
 
 const getUsers = asyncHandler(async (req, res) => {
-  const users = await User.find({}).select("-password").sort({ createdAt: -1 });
+  const {
+    keyword = "",
+    role = "all",
+    status = "all",
+    sort = "newest",
+    page = 1,
+    limit = 10,
+  } = req.query;
+
+  const query = {};
+
+  if (keyword) {
+    query.$or = [
+      { name: { $regex: keyword, $options: "i" } },
+      { email: { $regex: keyword, $options: "i" } },
+      { phone: { $regex: keyword, $options: "i" } },
+    ];
+  }
+
+  if (role !== "all") {
+    query.role = role;
+  }
+
+  if (status !== "all") {
+    query.status = status;
+  }
+
+  const sortMap = {
+    newest: { createdAt: -1 },
+    name_az: { name: 1 },
+    email_az: { email: 1 },
+  };
+
+  const pageNumber = Number(page);
+  const limitNumber = Number(limit);
+  const skip = (pageNumber - 1) * limitNumber;
+
+  const [users, totalUsers] = await Promise.all([
+    User.find(query)
+      .select("-password")
+      .sort(sortMap[sort] || sortMap.newest)
+      .skip(skip)
+      .limit(limitNumber),
+    User.countDocuments(query),
+  ]);
 
   res.status(200).json({
     success: true,
     users,
+    pagination: {
+      page: pageNumber,
+      limit: limitNumber,
+      totalUsers,
+      totalPages: Math.ceil(totalUsers / limitNumber),
+    },
   });
 });
 

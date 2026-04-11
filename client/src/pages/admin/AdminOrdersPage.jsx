@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import AdminDataTable from "../../components/admin/AdminDataTable";
 import AppModal from "../../components/common/AppModal";
 import ConfirmModal from "../../components/common/ConfirmModal";
+import PaginationControls from "../../components/common/PaginationControls";
 import SearchableSelect from "../../components/common/SearchableSelect";
 import StatusMessage from "../../components/common/StatusMessage";
 import {
@@ -32,10 +33,14 @@ const orderStatuses = [
 const paymentStatuses = ["pending", "paid", "failed"];
 const paymentMethods = ["cod", "gcash"];
 
-const initialFormState = {
-  userId: "",
+const createEmptyOrderItem = () => ({
   productId: "",
   quantity: 1,
+});
+
+const initialFormState = {
+  userId: "",
+  orderItems: [createEmptyOrderItem()],
   fullName: "",
   phone: "",
   street: "",
@@ -52,7 +57,9 @@ const initialFormState = {
 
 function AdminOrdersPage() {
   const dispatch = useDispatch();
-  const { orders, users, isLoading, error } = useSelector((state) => state.admin);
+  const { orders, users, ordersPagination, isLoading, error } = useSelector(
+    (state) => state.admin
+  );
   const { adminItems } = useSelector((state) => state.products);
   const [formData, setFormData] = useState(initialFormState);
   const [editingOrder, setEditingOrder] = useState(null);
@@ -64,12 +71,24 @@ function AdminOrdersPage() {
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOption, setSortOption] = useState("newest");
+  const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
-    dispatch(fetchAdminOrders());
-    dispatch(fetchUsers());
-    dispatch(fetchAdminProducts());
+    dispatch(
+      fetchAdminOrders({
+        keyword: debouncedSearch,
+        paymentMethod: paymentFilter,
+        orderStatus: statusFilter,
+        sort: sortOption,
+        page,
+      })
+    );
+  }, [debouncedSearch, dispatch, page, paymentFilter, sortOption, statusFilter]);
+
+  useEffect(() => {
+    dispatch(fetchUsers({ limit: 100 }));
+    dispatch(fetchAdminProducts({ limit: 100 }));
   }, [dispatch]);
 
   const resetForm = () => {
@@ -91,8 +110,10 @@ function AdminOrdersPage() {
     setEditingOrder(order);
     setFormData({
       userId: order.user?._id || "",
-      productId: order.orderItems?.[0]?.product || "",
-      quantity: order.orderItems?.[0]?.quantity || 1,
+      orderItems: order.orderItems.map((item) => ({
+        productId: item.product,
+        quantity: item.quantity,
+      })),
       fullName: order.shippingAddress?.fullName || "",
       phone: order.shippingAddress?.phone || "",
       street: order.shippingAddress?.street || "",
@@ -117,18 +138,47 @@ function AdminOrdersPage() {
     }));
   };
 
+  const handleOrderItemChange = (index, patch) => {
+    setFormData((current) => ({
+      ...current,
+      orderItems: current.orderItems.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      ),
+    }));
+  };
+
+  const addOrderItemRow = () => {
+    setFormData((current) => ({
+      ...current,
+      orderItems: [...current.orderItems, createEmptyOrderItem()],
+    }));
+  };
+
+  const removeOrderItemRow = (index) => {
+    setFormData((current) => ({
+      ...current,
+      orderItems: current.orderItems.filter((_, itemIndex) => itemIndex !== index),
+    }));
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!editingOrder && (!formData.userId || !formData.productId)) {
-      toast.error("Please select both a customer and a product.");
+    if (!editingOrder && !formData.userId) {
+      toast.error("Please select a customer.");
+      return;
+    }
+
+    if (
+      !editingOrder &&
+      formData.orderItems.some((item) => !item.productId || Number(item.quantity) < 1)
+    ) {
+      toast.error("Please complete each product line before creating the order.");
       return;
     }
 
     const payload = {
       userId: formData.userId,
-      productId: formData.productId,
-      quantity: Number(formData.quantity),
       shippingAddress: {
         fullName: formData.fullName,
         phone: formData.phone,
@@ -149,20 +199,23 @@ function AdminOrdersPage() {
       ? await dispatch(
           updateAdminOrder({
             orderId: editingOrder._id,
-            shippingAddress: payload.shippingAddress,
-            paymentMethod: payload.paymentMethod,
-            paymentStatus: payload.paymentStatus,
-            orderStatus: payload.orderStatus,
-            gcashReference: payload.gcashReference,
-            notes: payload.notes,
+            ...payload,
           })
         )
-      : await dispatch(createAdminOrder(payload));
+      : await dispatch(
+          createAdminOrder({
+            ...payload,
+            orderItems: formData.orderItems.map((item) => ({
+              productId: item.productId,
+              quantity: Number(item.quantity),
+            })),
+          })
+        );
 
     if (createAdminOrder.fulfilled.match(result) || updateAdminOrder.fulfilled.match(result)) {
       toast.success(editingOrder ? "Order updated successfully." : "Order created successfully.");
       closeModal();
-    } else if (createAdminOrder.rejected.match(result) || updateAdminOrder.rejected.match(result)) {
+    } else {
       toast.error(result.payload || "Failed to save order.");
     }
   };
@@ -195,39 +248,6 @@ function AdminOrdersPage() {
 
     return toneMap[status] || "bg-white/5 text-white/70";
   };
-
-  const filteredOrders = useMemo(() => {
-    const normalizedSearch = debouncedSearch.trim().toLowerCase();
-
-    let nextItems = orders.filter((order) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        `${order._id} ${order.user?.name || ""} ${order.user?.email || ""}`
-          .toLowerCase()
-          .includes(normalizedSearch);
-      const matchesPayment =
-        paymentFilter === "all" || order.paymentMethod === paymentFilter;
-      const matchesStatus =
-        statusFilter === "all" || order.orderStatus === statusFilter;
-
-      return matchesSearch && matchesPayment && matchesStatus;
-    });
-
-    nextItems = [...nextItems].sort((left, right) => {
-      switch (sortOption) {
-        case "oldest":
-          return new Date(left.createdAt) - new Date(right.createdAt);
-        case "total_high":
-          return right.totalPrice - left.totalPrice;
-        case "total_low":
-          return left.totalPrice - right.totalPrice;
-        default:
-          return new Date(right.createdAt) - new Date(left.createdAt);
-      }
-    });
-
-    return nextItems;
-  }, [debouncedSearch, orders, paymentFilter, sortOption, statusFilter]);
 
   const userOptions = useMemo(
     () =>
@@ -276,15 +296,13 @@ function AdminOrdersPage() {
             <span className="rounded-[8px] bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-white/70">
               {row.original.paymentMethod}
             </span>
-            <div>
-              <span
-                className={`rounded-[8px] px-3 py-1 text-xs font-semibold ${statusClassName(
-                  row.original.paymentStatus
-                )}`}
-              >
-                {row.original.paymentStatus}
-              </span>
-            </div>
+            <span
+              className={`rounded-[8px] px-3 py-1 text-xs font-semibold ${statusClassName(
+                row.original.paymentStatus
+              )}`}
+            >
+              {row.original.paymentStatus}
+            </span>
           </div>
         ),
       }),
@@ -373,7 +391,10 @@ function AdminOrdersPage() {
             <input
               type="text"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(1);
+              }}
               placeholder="Search by order id, customer name, or email"
               className="field"
             />
@@ -386,7 +407,10 @@ function AdminOrdersPage() {
             </span>
             <select
               value={paymentFilter}
-              onChange={(event) => setPaymentFilter(event.target.value)}
+              onChange={(event) => {
+                setPaymentFilter(event.target.value);
+                setPage(1);
+              }}
               className="field"
             >
               <option value="all">All payment methods</option>
@@ -402,7 +426,10 @@ function AdminOrdersPage() {
             </span>
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
               className="field"
             >
               <option value="all">All statuses</option>
@@ -423,7 +450,10 @@ function AdminOrdersPage() {
             </span>
             <select
               value={sortOption}
-              onChange={(event) => setSortOption(event.target.value)}
+              onChange={(event) => {
+                setSortOption(event.target.value);
+                setPage(1);
+              }}
               className="field"
             >
               <option value="newest">Newest first</option>
@@ -434,16 +464,15 @@ function AdminOrdersPage() {
           </label>
 
           <div className="flex items-end">
-            <p className="text-sm text-white/45">
-              Showing {filteredOrders.length} of {orders.length} orders
-            </p>
+            <p className="text-sm text-white/45">Showing {orders.length} orders on this page</p>
           </div>
         </div>
       </div>
 
       <StatusMessage type="error" message={error} />
 
-      <AdminDataTable columns={columns} data={filteredOrders} emptyMessage="No orders found." />
+      <AdminDataTable columns={columns} data={orders} emptyMessage="No orders found." />
+      <PaginationControls pagination={ordersPagination} onPageChange={setPage} />
 
       <AppModal
         isOpen={isModalOpen}
@@ -455,7 +484,7 @@ function AdminOrdersPage() {
           <StatusMessage type="error" message={error} />
 
           {!editingOrder ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <>
               <SearchableSelect
                 label="Customer"
                 placeholder="Search customer by name or email"
@@ -470,136 +499,103 @@ function AdminOrdersPage() {
                 emptyMessage="No matching users found."
               />
 
-              <SearchableSelect
-                label="Product"
-                placeholder="Search product by name or category"
-                options={productOptions}
-                value={formData.productId}
-                onChange={(value) =>
-                  setFormData((current) => ({
-                    ...current,
-                    productId: value,
-                  }))
-                }
-                emptyMessage="No matching products found."
-              />
-            </div>
+              <div className="space-y-3 rounded-[10px] border border-white/10 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-white/80">Order items</p>
+                  <button type="button" onClick={addOrderItemRow} className="btn-secondary px-4 py-2">
+                    Add item
+                  </button>
+                </div>
+
+                {formData.orderItems.map((item, index) => (
+                  <div key={`order-item-${index}`} className="grid gap-3 rounded-[10px] border border-white/10 p-3 md:grid-cols-[1fr_140px_auto]">
+                    <SearchableSelect
+                      label={`Product ${index + 1}`}
+                      placeholder="Search product by name or category"
+                      options={productOptions}
+                      value={item.productId}
+                      onChange={(value) => handleOrderItemChange(index, { productId: value })}
+                      emptyMessage="No matching products found."
+                    />
+
+                    <label className="block space-y-2">
+                      <span className="text-sm font-semibold text-white/80">Quantity</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(event) =>
+                          handleOrderItemChange(index, {
+                            quantity: Number(event.target.value),
+                          })
+                        }
+                        className="field"
+                        required
+                      />
+                    </label>
+
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => removeOrderItemRow(index)}
+                        disabled={formData.orderItems.length === 1}
+                        className="rounded-[10px] border border-rose-500/20 px-4 py-3 text-rose-300 disabled:cursor-not-allowed disabled:text-white/25"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="panel-muted p-4 text-sm text-white/70">
-              Line items are kept stable during admin edits. For a different customer or
-              product selection, create a new order instead.
+              Line items are kept stable during admin edits. For different products, create a new order.
             </div>
           )}
-
-          {!editingOrder ? (
-            <label className="block space-y-2">
-              <span className="text-sm font-semibold text-white/80">Quantity</span>
-              <input
-                type="number"
-                min="1"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                placeholder="Enter order quantity"
-                className="field"
-                required
-              />
-            </label>
-          ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">Receiver name</span>
-              <input
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleChange}
-                placeholder="Enter receiver full name"
-                className="field"
-                required
-              />
+              <input name="fullName" value={formData.fullName} onChange={handleChange} className="field" required />
             </label>
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">Receiver phone</span>
-              <input
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Enter receiver phone number"
-                className="field"
-                required
-              />
+              <input name="phone" value={formData.phone} onChange={handleChange} className="field" required />
             </label>
           </div>
 
           <label className="block space-y-2">
             <span className="text-sm font-semibold text-white/80">Street address</span>
-            <input
-              name="street"
-              value={formData.street}
-              onChange={handleChange}
-              placeholder="Enter street address"
-              className="field"
-              required
-            />
+            <input name="street" value={formData.street} onChange={handleChange} className="field" required />
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">City</span>
-              <input
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                placeholder="Enter city"
-                className="field"
-                required
-              />
+              <input name="city" value={formData.city} onChange={handleChange} className="field" required />
             </label>
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">State / Province</span>
-              <input
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                placeholder="Enter state or province"
-                className="field"
-              />
+              <input name="state" value={formData.state} onChange={handleChange} className="field" />
             </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">Postal code</span>
-              <input
-                name="postalCode"
-                value={formData.postalCode}
-                onChange={handleChange}
-                placeholder="Enter postal code"
-                className="field"
-              />
+              <input name="postalCode" value={formData.postalCode} onChange={handleChange} className="field" />
             </label>
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">Country</span>
-              <input
-                name="country"
-                value={formData.country}
-                onChange={handleChange}
-                placeholder="Enter country"
-                className="field"
-              />
+              <input name="country" value={formData.country} onChange={handleChange} className="field" />
             </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">Payment method</span>
-              <select
-                name="paymentMethod"
-                value={formData.paymentMethod}
-                onChange={handleChange}
-                className="field"
-              >
+              <select name="paymentMethod" value={formData.paymentMethod} onChange={handleChange} className="field">
                 {paymentMethods.map((method) => (
                   <option key={method} value={method}>
                     {method.toUpperCase()}
@@ -610,12 +606,7 @@ function AdminOrdersPage() {
 
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">Payment status</span>
-              <select
-                name="paymentStatus"
-                value={formData.paymentStatus}
-                onChange={handleChange}
-                className="field"
-              >
+              <select name="paymentStatus" value={formData.paymentStatus} onChange={handleChange} className="field">
                 {paymentStatuses.map((status) => (
                   <option key={status} value={status}>
                     {status}
@@ -626,12 +617,7 @@ function AdminOrdersPage() {
 
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">Order status</span>
-              <select
-                name="orderStatus"
-                value={formData.orderStatus}
-                onChange={handleChange}
-                className="field"
-              >
+              <select name="orderStatus" value={formData.orderStatus} onChange={handleChange} className="field">
                 {orderStatuses.map((status) => (
                   <option key={status} value={status}>
                     {status.replaceAll("_", " ")}
@@ -644,26 +630,13 @@ function AdminOrdersPage() {
           {formData.paymentMethod === "gcash" ? (
             <label className="block space-y-2">
               <span className="text-sm font-semibold text-white/80">GCash reference</span>
-              <input
-                name="gcashReference"
-                value={formData.gcashReference}
-                onChange={handleChange}
-                placeholder="Enter GCash reference"
-                className="field"
-              />
+              <input name="gcashReference" value={formData.gcashReference} onChange={handleChange} className="field" />
             </label>
           ) : null}
 
           <label className="block space-y-2">
             <span className="text-sm font-semibold text-white/80">Notes</span>
-            <textarea
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              rows="4"
-              placeholder="Add any internal note or delivery instruction"
-              className="field"
-            />
+            <textarea name="notes" value={formData.notes} onChange={handleChange} rows="4" className="field" />
           </label>
 
           <div className="flex justify-end gap-3">
@@ -680,9 +653,7 @@ function AdminOrdersPage() {
       <AppModal
         isOpen={Boolean(viewOrder)}
         onClose={() => setViewOrder(null)}
-        title={
-          viewOrder ? `Order #${viewOrder._id.slice(-6).toUpperCase()}` : "Order details"
-        }
+        title={viewOrder ? `Order #${viewOrder._id.slice(-6).toUpperCase()}` : "Order details"}
         description="Review payment, shipping, and line-item details."
         width="max-w-3xl"
       >
@@ -725,11 +696,7 @@ function AdminOrdersPage() {
               <div className="mt-3 space-y-3">
                 {viewOrder.orderItems.map((item) => (
                   <div key={`${item.product}-${item.name}`} className="flex items-center gap-3">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="h-14 w-14 rounded-[10px] object-cover"
-                    />
+                    <img src={item.image} alt={item.name} className="h-14 w-14 rounded-[10px] object-cover" />
                     <div className="flex-1">
                       <p className="font-semibold text-white">{item.name}</p>
                       <p className="text-white/50">

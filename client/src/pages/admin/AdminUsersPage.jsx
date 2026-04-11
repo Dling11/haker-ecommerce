@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 import AdminDataTable from "../../components/admin/AdminDataTable";
 import AppModal from "../../components/common/AppModal";
 import ConfirmModal from "../../components/common/ConfirmModal";
+import PaginationControls from "../../components/common/PaginationControls";
 import StatusMessage from "../../components/common/StatusMessage";
 import {
   clearUploadedImage,
@@ -50,7 +51,7 @@ const initialFormState = {
 
 function AdminUsersPage() {
   const dispatch = useDispatch();
-  const { users, isLoading, error, uploadLoading, uploadedImage } = useSelector(
+  const { users, usersPagination, isLoading, error, uploadLoading, uploadedImage } = useSelector(
     (state) => state.admin
   );
   const [formData, setFormData] = useState(initialFormState);
@@ -65,12 +66,21 @@ function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOption, setSortOption] = useState("newest");
+  const [page, setPage] = useState(1);
   const currentEditingUser = users.find((user) => user._id === editingUserId);
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
-    dispatch(fetchUsers());
-  }, [dispatch]);
+    dispatch(
+      fetchUsers({
+        keyword: debouncedSearch,
+        role: roleFilter,
+        status: statusFilter,
+        sort: sortOption,
+        page,
+      })
+    );
+  }, [debouncedSearch, dispatch, page, roleFilter, sortOption, statusFilter]);
 
   useEffect(() => {
     if (uploadedImage?.url) {
@@ -334,33 +344,6 @@ function AdminUsersPage() {
     []
   );
 
-  const filteredUsers = useMemo(() => {
-    const normalizedSearch = debouncedSearch.trim().toLowerCase();
-
-    let nextItems = users.filter((user) => {
-      const matchesSearch =
-        !normalizedSearch ||
-        `${user.name} ${user.email} ${user.phone || ""}`.toLowerCase().includes(normalizedSearch);
-      const matchesRole = roleFilter === "all" || user.role === roleFilter;
-      const matchesStatus = statusFilter === "all" || user.status === statusFilter;
-
-      return matchesSearch && matchesRole && matchesStatus;
-    });
-
-    nextItems = [...nextItems].sort((left, right) => {
-      switch (sortOption) {
-        case "name_az":
-          return left.name.localeCompare(right.name);
-        case "email_az":
-          return left.email.localeCompare(right.email);
-        default:
-          return new Date(right.createdAt) - new Date(left.createdAt);
-      }
-    });
-
-    return nextItems;
-  }, [debouncedSearch, roleFilter, sortOption, statusFilter, users]);
-
   return (
     <section className="space-y-4">
       <div className="panel p-6">
@@ -392,7 +375,10 @@ function AdminUsersPage() {
             <input
               type="text"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(1);
+              }}
               placeholder="Search by name, email, or phone"
               className="field"
             />
@@ -405,7 +391,10 @@ function AdminUsersPage() {
             </span>
             <select
               value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
+              onChange={(event) => {
+                setRoleFilter(event.target.value);
+                setPage(1);
+              }}
               className="field"
             >
               <option value="all">All roles</option>
@@ -421,7 +410,10 @@ function AdminUsersPage() {
             </span>
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
               className="field"
             >
               <option value="all">All statuses</option>
@@ -440,7 +432,10 @@ function AdminUsersPage() {
             </span>
             <select
               value={sortOption}
-              onChange={(event) => setSortOption(event.target.value)}
+              onChange={(event) => {
+                setSortOption(event.target.value);
+                setPage(1);
+              }}
               className="field"
             >
               <option value="newest">Newest first</option>
@@ -451,7 +446,7 @@ function AdminUsersPage() {
 
           <div className="flex items-end">
             <p className="text-sm text-white/45">
-              Showing {filteredUsers.length} of {users.length} users
+              Showing {users.length} users on this page
             </p>
           </div>
         </div>
@@ -459,7 +454,8 @@ function AdminUsersPage() {
 
       <StatusMessage type="error" message={error} />
 
-      <AdminDataTable columns={columns} data={filteredUsers} emptyMessage="No users found." />
+      <AdminDataTable columns={columns} data={users} emptyMessage="No users found." />
+      <PaginationControls pagination={usersPagination} onPageChange={setPage} />
 
       <AppModal
         isOpen={isFormModalOpen}

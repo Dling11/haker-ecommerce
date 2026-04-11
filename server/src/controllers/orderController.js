@@ -77,8 +77,7 @@ const createOrder = asyncHandler(async (req, res) => {
 const createAdminOrder = asyncHandler(async (req, res) => {
   const {
     userId,
-    productId,
-    quantity,
+    orderItems,
     shippingAddress,
     paymentMethod,
     paymentStatus,
@@ -87,37 +86,38 @@ const createAdminOrder = asyncHandler(async (req, res) => {
     notes,
   } = req.body;
 
-  const [user, product] = await Promise.all([
-    User.findById(userId),
-    Product.findById(productId),
-  ]);
+  const user = await User.findById(userId);
 
   if (!user) {
     res.status(404);
     throw new Error("User not found.");
   }
 
-  if (!product || !product.isPublished) {
-    res.status(404);
-    throw new Error("Product not found.");
-  }
+  const normalizedOrderItems = [];
 
-  if (product.stock < quantity) {
-    res.status(400);
-    throw new Error("Insufficient stock for the selected product.");
-  }
+  for (const item of orderItems) {
+    const product = await Product.findById(item.productId);
 
-  const orderItems = [
-    {
+    if (!product || !product.isPublished) {
+      res.status(404);
+      throw new Error("One of the selected products could not be found.");
+    }
+
+    if (product.stock < item.quantity) {
+      res.status(400);
+      throw new Error(`Insufficient stock for ${product.name}.`);
+    }
+
+    normalizedOrderItems.push({
       product: product._id,
       name: product.name,
       image: product.images?.[0]?.url || "",
       price: product.price,
-      quantity,
-    },
-  ];
+      quantity: item.quantity,
+    });
+  }
 
-  const totals = calculateTotals(orderItems);
+  const totals = calculateTotals(normalizedOrderItems);
   const resolvedPaymentStatus =
     paymentStatus || (paymentMethod === "gcash" ? "paid" : "pending");
   const resolvedOrderStatus =
@@ -125,7 +125,7 @@ const createAdminOrder = asyncHandler(async (req, res) => {
 
   const order = await Order.create({
     user: user._id,
-    orderItems,
+    orderItems: normalizedOrderItems,
     shippingAddress,
     paymentMethod,
     paymentStatus: resolvedPaymentStatus,
@@ -137,9 +137,13 @@ const createAdminOrder = asyncHandler(async (req, res) => {
     ...totals,
   });
 
-  await Product.findByIdAndUpdate(product._id, {
-    $inc: { stock: -quantity },
-  });
+  await Promise.all(
+    normalizedOrderItems.map((item) =>
+      Product.findByIdAndUpdate(item.product, {
+        $inc: { stock: -item.quantity },
+      })
+    )
+  );
 
   const populatedOrder = await Order.findById(order._id).populate("user", "name email");
 
@@ -179,13 +183,74 @@ const getOrderById = asyncHandler(async (req, res) => {
 });
 
 const getAllOrders = asyncHandler(async (req, res) => {
-  const orders = await Order.find({})
-    .populate("user", "name email")
-    .sort({ createdAt: -1 });
+  const {
+    keyword = "",
+    paymentMethod = "all",
+    orderStatus = "all",
+    sort = "newest",
+    page = 1,
+    limit = 10,
+  } = req.query;
+
+  const userQuery = keyword
+    ? {
+        $or: [
+          { name: { $regex: keyword, $options: "i" } },
+          { email: { $regex: keyword, $options: "i" } },
+        ],
+      }
+    : {};
+
+  const matchedUserIds = keyword
+    ? await User.find(userQuery).distinct("_id")
+    : [];
+
+  const query = {};
+
+  if (keyword) {
+    query.$or = [
+      { _id: /^[a-fA-F0-9]{24}$/.test(keyword) ? keyword : undefined },
+      { user: { $in: matchedUserIds } },
+    ].filter(Boolean);
+  }
+
+  if (paymentMethod !== "all") {
+    query.paymentMethod = paymentMethod;
+  }
+
+  if (orderStatus !== "all") {
+    query.orderStatus = orderStatus;
+  }
+
+  const sortMap = {
+    newest: { createdAt: -1 },
+    oldest: { createdAt: 1 },
+    total_high: { totalPrice: -1 },
+    total_low: { totalPrice: 1 },
+  };
+
+  const pageNumber = Number(page);
+  const limitNumber = Number(limit);
+  const skip = (pageNumber - 1) * limitNumber;
+
+  const [orders, totalOrders] = await Promise.all([
+    Order.find(query)
+      .populate("user", "name email")
+      .sort(sortMap[sort] || sortMap.newest)
+      .skip(skip)
+      .limit(limitNumber),
+    Order.countDocuments(query),
+  ]);
 
   res.status(200).json({
     success: true,
     orders,
+    pagination: {
+      page: pageNumber,
+      limit: limitNumber,
+      totalOrders,
+      totalPages: Math.ceil(totalOrders / limitNumber),
+    },
   });
 });
 

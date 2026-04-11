@@ -1,28 +1,40 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 
 import AdminRoute from "./components/common/AdminRoute";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicOnlyRoute from "./components/common/PublicOnlyRoute";
 import RootRedirect from "./components/common/RootRedirect";
-import AdminLayout from "./layouts/AdminLayout";
 import AuthLayout from "./layouts/AuthLayout";
 import MainLayout from "./layouts/MainLayout";
-import CartPage from "./pages/CartPage";
-import CheckoutPage from "./pages/CheckoutPage";
-import HomePage from "./pages/HomePage";
-import LoginPage from "./pages/LoginPage";
 import NotFoundPage from "./pages/NotFoundPage";
-import OrdersPage from "./pages/OrdersPage";
-import ProfilePage from "./pages/ProfilePage";
-import RegisterPage from "./pages/RegisterPage";
-import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
-import AdminOrdersPage from "./pages/admin/AdminOrdersPage";
-import AdminProductsPage from "./pages/admin/AdminProductsPage";
-import AdminUsersPage from "./pages/admin/AdminUsersPage";
+
+const AdminLayout = lazy(() => import("./layouts/AdminLayout"));
+const CartPage = lazy(() => import("./pages/CartPage"));
+const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
+const HomePage = lazy(() => import("./pages/HomePage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
+const AdminOrdersPage = lazy(() => import("./pages/admin/AdminOrdersPage"));
+const AdminProductsPage = lazy(() => import("./pages/admin/AdminProductsPage"));
+const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
+const AdminCategoriesPage = lazy(() => import("./pages/admin/AdminCategoriesPage"));
+
+function AppFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 text-sm text-white/70">
+      Loading workspace...
+    </div>
+  );
+}
 
 function App() {
   return (
-    <Routes>
+    <Suspense fallback={<AppFallback />}>
+      <Routes>
       <Route path="/" element={<RootRedirect />} />
 
       <Route element={<PublicOnlyRoute />}>
@@ -47,11 +59,13 @@ function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="products" element={<AdminProductsPage />} />
+          <Route path="categories" element={<AdminCategoriesPage />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="orders" element={<AdminOrdersPage />} />
         </Route>
       </Route>
     </Routes>
+    </Suspense>
   )
 }
 

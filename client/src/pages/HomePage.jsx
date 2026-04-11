@@ -1,26 +1,36 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
+import PaginationControls from "../components/common/PaginationControls";
 import StatusMessage from "../components/common/StatusMessage";
 import ProductCard from "../components/products/ProductCard";
 import { fetchProducts } from "../features/products/productSlice";
+import useDebouncedValue from "../hooks/useDebouncedValue";
 
 function HomePage() {
   const dispatch = useDispatch();
-  const { items, categories, isLoading, error } = useSelector((state) => state.products);
+  const { items, categories, pagination, isLoading, error } = useSelector((state) => state.products);
   const [filters, setFilters] = useState({
     keyword: "",
     category: "",
+    page: 1,
   });
+  const debouncedKeyword = useDebouncedValue(filters.keyword, 300);
 
   useEffect(() => {
-    dispatch(fetchProducts(filters));
-  }, [dispatch, filters]);
+    dispatch(
+      fetchProducts({
+        ...filters,
+        keyword: debouncedKeyword,
+      })
+    );
+  }, [debouncedKeyword, dispatch, filters.category, filters.page]);
 
   const handleChange = (event) => {
     setFilters((current) => ({
       ...current,
       [event.target.name]: event.target.value,
+      page: 1,
     }));
   };
 
@@ -93,8 +103,8 @@ function HomePage() {
                 All categories
               </option>
               {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
+                <option key={category._id} value={category.name}>
+                  {category.name}
                 </option>
               ))}
             </select>
@@ -107,11 +117,22 @@ function HomePage() {
       {isLoading ? (
         <p className="text-slate-500">Loading products...</p>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {items.map((product) => (
-            <ProductCard key={product._id} product={product} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {items.map((product) => (
+              <ProductCard key={product._id} product={product} />
+            ))}
+          </div>
+          <PaginationControls
+            pagination={pagination}
+            onPageChange={(nextPage) =>
+              setFilters((current) => ({
+                ...current,
+                page: nextPage,
+              }))
+            }
+          />
+        </>
       )}
 
       {!isLoading && items.length === 0 ? (
