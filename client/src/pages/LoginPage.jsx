@@ -62,7 +62,7 @@ function LoginPage() {
             value={formData.email}
             onChange={handleChange}
             className="w-full rounded-[10px] border border-white/10 bg-[#11151c] px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
-            placeholder="you@example.com"
+            placeholder="Enter your email address"
             required
           />
         </label>

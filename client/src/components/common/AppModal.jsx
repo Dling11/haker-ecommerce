@@ -2,7 +2,24 @@ import { Dialog, DialogPanel, Transition, TransitionChild } from "@headlessui/re
 import { Fragment } from "react";
 import { X } from "lucide-react";
 
-function AppModal({ isOpen, onClose, title, description, children, width = "max-w-2xl" }) {
+function AppModal({
+  isOpen,
+  onClose,
+  title,
+  description,
+  children,
+  width = "max-w-2xl",
+  variant = "dark",
+}) {
+  const isLight = variant === "light";
+  const panelClassName = isLight
+    ? "border border-violet-100 bg-white text-slate-900 shadow-[0_24px_80px_rgba(66,39,140,0.18)]"
+    : "border border-white/10 bg-[#171c24] text-white shadow-[0_24px_80px_rgba(0,0,0,0.4)]";
+  const descriptionClassName = isLight ? "text-slate-500" : "text-white/60";
+  const closeButtonClassName = isLight
+    ? "border border-slate-200 text-slate-500 hover:bg-slate-50"
+    : "border border-white/10 text-white/65";
+
   return (
     <Transition show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -30,20 +47,22 @@ function AppModal({ isOpen, onClose, title, description, children, width = "max-
               leaveTo="opacity-0 translate-y-4"
             >
               <DialogPanel
-                className={`w-full ${width} rounded-[10px] border border-white/10 bg-[#171c24] p-6 text-white shadow-[0_24px_80px_rgba(0,0,0,0.4)]`}
+                className={`w-full ${width} rounded-[10px] p-6 ${panelClassName}`}
               >
                 <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-black text-white">{title}</h2>
+                    <h2 className="text-2xl font-black">{title}</h2>
                     {description ? (
-                      <p className="mt-2 text-sm leading-6 text-white/60">{description}</p>
+                      <p className={`mt-2 text-sm leading-6 ${descriptionClassName}`}>
+                        {description}
+                      </p>
                     ) : null}
                   </div>
 
                   <button
                     type="button"
                     onClick={onClose}
-                    className="rounded-[10px] border border-white/10 p-2 text-white/65"
+                    className={`rounded-[10px] p-2 transition ${closeButtonClassName}`}
                   >
                     <X size={18} />
                   </button>

@@ -125,7 +125,7 @@ function CartDrawer() {
                                         Number(event.target.value)
                                       )
                                     }
-                                    className="w-20 rounded-[10px] border border-slate-200 px-3 py-2 text-sm"
+                                    className="w-20 rounded-[10px] border text-slate-900 px-3 py-2 text-sm"
                                   />
                                   <button
                                     type="button"

@@ -1,18 +1,25 @@
-import { ShoppingCart } from "lucide-react";
+import { Eye, ShoppingCart } from "lucide-react";
+import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { addCartItem, openCartDrawer } from "../../features/cart/cartSlice";
 import { formatCurrency } from "../../utils/formatCurrency";
+import ProductQuickViewModal from "./ProductQuickViewModal";
 
 function ProductCard({ product }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
   const { isLoading } = useSelector((state) => state.cart);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = async (event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+
     if (!user) {
       navigate("/login");
       return;
@@ -29,13 +36,28 @@ function ProductCard({ product }) {
   };
 
   return (
-    <article className="overflow-hidden rounded-[10px] border border-violet-100 bg-white shadow-soft">
-      <div className="aspect-[4/3] overflow-hidden bg-violet-50">
+    <>
+      <article
+        className="group cursor-pointer overflow-hidden rounded-[10px] border border-violet-100 bg-white shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(91,67,204,0.16)]"
+        onClick={() => setIsQuickViewOpen(true)}
+      >
+      <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#faf7ff_0%,#f7fbff_100%)] p-4">
         <img
           src={product.images?.[0]?.url}
           alt={product.name}
-          className="h-full w-full object-cover transition duration-300 hover:scale-105"
+          className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]"
         />
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsQuickViewOpen(true);
+          }}
+          className="absolute right-4 top-4 inline-flex items-center gap-2 rounded-[10px] border border-white/70 bg-white/90 px-3 py-2 text-xs font-semibold text-slate-700 opacity-0 shadow-sm backdrop-blur transition group-hover:opacity-100"
+        >
+          <Eye size={14} />
+          Quick View
+        </button>
       </div>
 
       <div className="space-y-4 p-5">
@@ -78,11 +100,22 @@ function ProductCard({ product }) {
           </button>
         </div>
 
-        <Link to="/shop/cart" className="text-sm font-semibold text-violet-700">
+        <Link
+          to="/shop/cart"
+          onClick={(event) => event.stopPropagation()}
+          className="text-sm font-semibold text-violet-700"
+        >
           View cart
         </Link>
       </div>
     </article>
+
+      <ProductQuickViewModal
+        product={product}
+        isOpen={isQuickViewOpen}
+        onClose={() => setIsQuickViewOpen(false)}
+      />
+    </>
   );
 }
 

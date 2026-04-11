@@ -90,7 +90,7 @@ function CheckoutPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Full name</span>
-            <input name="fullName" value={formData.fullName} onChange={handleChange} className="field" required />
+            <input name="fullName" value={formData.fullName} onChange={handleChange} className="field" required  />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Phone</span>
@@ -100,28 +100,28 @@ function CheckoutPage() {
 
         <label className="space-y-2 block">
           <span className="text-sm font-semibold text-slate-700">Street</span>
-          <input name="street" value={formData.street} onChange={handleChange} className="field" required />
+          <input name="street" value={formData.street} onChange={handleChange} className="field" required placeholder="Enter street address" />
         </label>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">City</span>
-            <input name="city" value={formData.city} onChange={handleChange} className="field" required />
+            <input name="city" value={formData.city} onChange={handleChange} className="field" required placeholder="Enter city" />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Province / State</span>
-            <input name="state" value={formData.state} onChange={handleChange} className="field" />
+            <input name="state" value={formData.state} onChange={handleChange} className="field" placeholder="Enter province or state" />
           </label>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Postal code</span>
-            <input name="postalCode" value={formData.postalCode} onChange={handleChange} className="field" />
+            <input name="postalCode" value={formData.postalCode} onChange={handleChange} className="field" placeholder="Enter postal code" />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Country</span>
-            <input name="country" value={formData.country} onChange={handleChange} className="field" />
+            <input name="country" value={formData.country} onChange={handleChange} className="field" placeholder="Enter country" />
           </label>
         </div>
 

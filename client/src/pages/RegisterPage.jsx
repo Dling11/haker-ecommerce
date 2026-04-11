@@ -61,6 +61,7 @@ function RegisterPage() {
             value={formData.name}
             onChange={handleChange}
             className="w-full rounded-[10px] border border-white/10 bg-[#11151c] px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
+            placeholder="Enter your full name"
             required
           />
         </label>
@@ -73,6 +74,7 @@ function RegisterPage() {
             value={formData.email}
             onChange={handleChange}
             className="w-full rounded-[10px] border border-white/10 bg-[#11151c] px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
+            placeholder="Enter your email address"
             required
           />
         </label>
@@ -85,6 +87,7 @@ function RegisterPage() {
             value={formData.phone}
             onChange={handleChange}
             className="w-full rounded-[10px] border border-white/10 bg-[#11151c] px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
+            placeholder="Enter your phone number"
           />
         </label>
 
@@ -97,6 +100,7 @@ function RegisterPage() {
               value={formData.password}
               onChange={handleChange}
               className="w-full rounded-[10px] border border-white/10 bg-[#11151c] px-4 py-3 pr-12 text-sm text-white outline-none transition focus:border-cyan-400"
+              placeholder="Enter your password"
               required
             />
             <button
