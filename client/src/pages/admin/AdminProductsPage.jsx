@@ -1,0 +1,302 @@
+import { createColumnHelper } from "@tanstack/react-table";
+import { ImagePlus, PencilLine, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import toast from "react-hot-toast";
+
+import AdminDataTable from "../../components/admin/AdminDataTable";
+import AppModal from "../../components/common/AppModal";
+import ConfirmModal from "../../components/common/ConfirmModal";
+import StatusMessage from "../../components/common/StatusMessage";
+import { clearUploadedImage, uploadAdminImage } from "../../features/admin/adminSlice";
+import {
+  createProduct,
+  deleteProduct,
+  fetchAdminProducts,
+  updateProduct,
+} from "../../features/products/productSlice";
+import { formatCurrency } from "../../utils/formatCurrency";
+
+const initialFormState = {
+  name: "",
+  description: "",
+  brand: "",
+  category: "",
+  price: "",
+  comparePrice: "",
+  stock: "",
+  imageUrl: "",
+  isFeatured: false,
+  isPublished: true,
+};
+
+const columnHelper = createColumnHelper();
+
+function AdminProductsPage() {
+  const dispatch = useDispatch();
+  const { adminItems, adminLoading, adminError } = useSelector((state) => state.products);
+  const { uploadLoading, uploadedImage, error } = useSelector((state) => state.admin);
+
+  const [formData, setFormData] = useState(initialFormState);
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
+
+  useEffect(() => {
+    dispatch(fetchAdminProducts());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (uploadedImage?.url) {
+      setFormData((current) => ({
+        ...current,
+        imageUrl: uploadedImage.url,
+      }));
+      toast.success("Image uploaded successfully.");
+      dispatch(clearUploadedImage());
+    }
+  }, [dispatch, uploadedImage]);
+
+  const resetForm = () => {
+    setEditingProductId(null);
+    setFormData(initialFormState);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    resetForm();
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  const startEditing = (product) => {
+    setEditingProductId(product._id);
+    setFormData({
+      name: product.name,
+      description: product.description,
+      brand: product.brand,
+      category: product.category,
+      price: product.price,
+      comparePrice: product.comparePrice,
+      stock: product.stock,
+      imageUrl: product.images?.[0]?.url || "",
+      isFeatured: product.isFeatured,
+      isPublished: product.isPublished,
+    });
+    setIsModalOpen(true);
+  };
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("name", {
+        header: "Product",
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            <img
+              src={row.original.images?.[0]?.url}
+              alt={row.original.name}
+              className="h-12 w-12 rounded-[10px] object-cover"
+            />
+            <div>
+              <p className="font-semibold text-white">{row.original.name}</p>
+              <p className="text-xs text-white/45">{row.original.brand || "Generic"}</p>
+            </div>
+          </div>
+        ),
+      }),
+      columnHelper.accessor("category", { header: "Category" }),
+      columnHelper.accessor("price", {
+        header: "Price",
+        cell: (info) => formatCurrency(info.getValue()),
+      }),
+      columnHelper.accessor("stock", { header: "Stock" }),
+      columnHelper.display({
+        id: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-[8px] bg-white/5 px-3 py-1 text-xs font-semibold text-white/75">
+              {row.original.isPublished ? "Published" : "Draft"}
+            </span>
+            {row.original.isFeatured ? (
+              <span className="rounded-[8px] bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                Featured
+              </span>
+            ) : null}
+          </div>
+        ),
+      }),
+      columnHelper.display({
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn-secondary px-4 py-2"
+              onClick={() => startEditing(row.original)}
+            >
+              <PencilLine size={16} />
+            </button>
+            <button
+              type="button"
+              className="rounded-[10px] border border-rose-500/20 px-4 py-2 text-rose-300 transition hover:bg-rose-500/10"
+              onClick={() => setProductToDelete(row.original)}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ),
+      }),
+    ],
+    []
+  );
+
+  const handleChange = (event) => {
+    const { name, value, checked, type } = event.target;
+    setFormData((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    await dispatch(uploadAdminImage({ file, folder: "haker-ecommerce/products" }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    const payload = {
+      name: formData.name,
+      description: formData.description,
+      brand: formData.brand,
+      category: formData.category,
+      price: Number(formData.price),
+      comparePrice: Number(formData.comparePrice || 0),
+      stock: Number(formData.stock),
+      isFeatured: formData.isFeatured,
+      isPublished: formData.isPublished,
+      images: [{ url: formData.imageUrl }],
+    };
+
+    const result = editingProductId
+      ? await dispatch(updateProduct({ productId: editingProductId, productData: payload }))
+      : await dispatch(createProduct(payload));
+
+    if (updateProduct.fulfilled.match(result) || createProduct.fulfilled.match(result)) {
+      toast.success(editingProductId ? "Product updated." : "Product created.");
+      closeModal();
+      dispatch(fetchAdminProducts());
+    }
+  };
+
+  const confirmDelete = async () => {
+    const result = await dispatch(deleteProduct(productToDelete._id));
+
+    if (deleteProduct.fulfilled.match(result)) {
+      toast.success("Product deleted.");
+      setProductToDelete(null);
+    }
+  };
+
+  return (
+    <section className="space-y-4">
+      <div className="panel p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent-600">
+              Product Inventory
+            </p>
+            <h2 className="mt-2 text-2xl font-black text-white">Manage catalog entries</h2>
+          </div>
+
+          <button type="button" onClick={openCreateModal} className="btn-primary gap-2">
+            <Plus size={16} />
+            Add Product
+          </button>
+        </div>
+        {adminLoading ? <p className="mt-2 text-sm text-white/45">Refreshing...</p> : null}
+      </div>
+
+      <StatusMessage type="error" message={adminError || error} />
+
+      <AdminDataTable columns={columns} data={adminItems} emptyMessage="No products found yet." />
+
+      <AppModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        title={editingProductId ? "Edit product" : "Add product"}
+        description="Use a focused modal to manage products without cluttering the table."
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <StatusMessage type="error" message={adminError || error} />
+          <input name="name" value={formData.name} onChange={handleChange} placeholder="Product name" className="field" required />
+          <textarea name="description" value={formData.description} onChange={handleChange} rows="4" placeholder="Description" className="field" required />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <input name="brand" value={formData.brand} onChange={handleChange} placeholder="Brand" className="field" />
+            <input name="category" value={formData.category} onChange={handleChange} placeholder="Category" className="field" required />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder="Price" className="field" required />
+            <input type="number" name="comparePrice" value={formData.comparePrice} onChange={handleChange} placeholder="Compare price" className="field" />
+            <input type="number" name="stock" value={formData.stock} onChange={handleChange} placeholder="Stock" className="field" required />
+          </div>
+
+          <div className="panel-muted space-y-3 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
+              <ImagePlus size={16} />
+              Upload product image
+            </div>
+            <input type="file" accept="image/*" onChange={handleImageUpload} className="field" />
+            {uploadLoading ? <p className="text-sm text-white/50">Uploading...</p> : null}
+          </div>
+
+          <input name="imageUrl" value={formData.imageUrl} onChange={handleChange} placeholder="Cloudinary image URL" className="field" required />
+
+          {formData.imageUrl ? (
+            <img src={formData.imageUrl} alt="Preview" className="h-44 w-full rounded-[10px] object-cover" />
+          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex items-center gap-3 text-sm text-white/75">
+              <input type="checkbox" name="isFeatured" checked={formData.isFeatured} onChange={handleChange} />
+              Feature this product
+            </label>
+            <label className="flex items-center gap-3 text-sm text-white/75">
+              <input type="checkbox" name="isPublished" checked={formData.isPublished} onChange={handleChange} />
+              Publish product
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
+            <button type="submit" className="btn-primary">
+              {editingProductId ? "Save Changes" : "Create Product"}
+            </button>
+          </div>
+        </form>
+      </AppModal>
+
+      <ConfirmModal
+        isOpen={Boolean(productToDelete)}
+        onClose={() => setProductToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete product?"
+        description={`This will permanently remove ${productToDelete?.name || "this product"} from the catalog.`}
+        confirmLabel="Delete product"
+      />
+    </section>
+  );
+}
+
+export default AdminProductsPage;
