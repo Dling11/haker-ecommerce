@@ -2,6 +2,7 @@ const streamifier = require("streamifier");
 const { v2: cloudinary } = require("cloudinary");
 
 const asyncHandler = require("../utils/asyncHandler");
+const { deleteCloudinaryImage } = require("../utils/cloudinaryAsset");
 
 const uploadImage = asyncHandler(async (req, res) => {
   if (!req.file) {
@@ -47,6 +48,37 @@ const uploadImage = asyncHandler(async (req, res) => {
   });
 });
 
+const deleteImage = asyncHandler(async (req, res) => {
+  const { publicId } = req.body;
+
+  if (!publicId) {
+    res.status(400);
+    throw new Error("Image public id is required.");
+  }
+
+  const isAdmin = req.user?.role === "admin";
+  const isUserAsset = publicId.startsWith("haker-ecommerce/users/");
+  const isProductAsset = publicId.startsWith("haker-ecommerce/products/");
+
+  if (!isUserAsset && !isProductAsset) {
+    res.status(403);
+    throw new Error("You are not allowed to delete this image.");
+  }
+
+  if (!isAdmin && !isUserAsset) {
+    res.status(403);
+    throw new Error("You are not allowed to delete this image.");
+  }
+
+  await deleteCloudinaryImage(publicId);
+
+  res.status(200).json({
+    success: true,
+    message: "Image deleted successfully.",
+  });
+});
+
 module.exports = {
+  deleteImage,
   uploadImage,
 };

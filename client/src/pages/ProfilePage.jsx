@@ -1,5 +1,5 @@
-import { ImagePlus, LoaderCircle } from "lucide-react";
-import { useState } from "react";
+import { LoaderCircle, Trash2, Upload, X } from "lucide-react";
+import { useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
 
@@ -12,6 +12,12 @@ function ProfilePage() {
   const { user, isLoading, error } = useSelector((state) => state.auth);
   const [successMessage, setSuccessMessage] = useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
+  const [originalAvatar] = useState({
+    url: user?.avatar?.url || "",
+    publicId: user?.avatar?.publicId || "",
+  });
+  const avatarInputRef = useRef(null);
   const [formData, setFormData] = useState({
     name: user?.name || "",
     phone: user?.phone || "",
@@ -47,6 +53,10 @@ function ProfilePage() {
 
     try {
       setIsUploadingAvatar(true);
+      const previousTemporaryPublicId =
+        formData.avatarPublicId && formData.avatarPublicId !== originalAvatar.publicId
+          ? formData.avatarPublicId
+          : "";
       const { data } = await api.post("/uploads/image", uploadData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -58,11 +68,65 @@ function ProfilePage() {
         avatar: data.image.url,
         avatarPublicId: data.image.publicId,
       }));
+
+      if (previousTemporaryPublicId) {
+        await api.delete("/uploads/image", {
+          data: { publicId: previousTemporaryPublicId },
+        });
+      }
+
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
+
       toast.success("Profile image uploaded.");
     } catch (uploadError) {
       toast.error(uploadError.response?.data?.message || "Failed to upload image.");
     } finally {
       setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!formData.avatarPublicId) {
+      return;
+    }
+
+    try {
+      setIsRemovingAvatar(true);
+      if (formData.avatarPublicId !== originalAvatar.publicId) {
+        await api.delete("/uploads/image", {
+          data: { publicId: formData.avatarPublicId },
+        });
+      }
+
+      if (originalAvatar.publicId && formData.avatarPublicId !== originalAvatar.publicId) {
+        setFormData((current) => ({
+          ...current,
+          avatar: originalAvatar.url,
+          avatarPublicId: originalAvatar.publicId,
+        }));
+        if (avatarInputRef.current) {
+          avatarInputRef.current.value = "";
+        }
+        toast.success("Reverted to your saved profile image.");
+        setIsRemovingAvatar(false);
+        return;
+      }
+
+      setFormData((current) => ({
+        ...current,
+        avatar: "",
+        avatarPublicId: "",
+      }));
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
+      toast.success("Profile image removed.");
+    } catch (removeError) {
+      toast.error(removeError.response?.data?.message || "Failed to remove profile image.");
+    } finally {
+      setIsRemovingAvatar(false);
     }
   };
 
@@ -135,10 +199,11 @@ function ProfilePage() {
               {isUploadingAvatar ? (
                 <LoaderCircle size={16} className="animate-spin" />
               ) : (
-                <ImagePlus size={16} />
+                <Upload size={16} />
               )}
               {isUploadingAvatar ? "Uploading..." : "Upload avatar"}
               <input
+                ref={avatarInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleAvatarUpload}
@@ -146,6 +211,25 @@ function ProfilePage() {
                 disabled={isUploadingAvatar}
               />
             </label>
+            {formData.avatar ? (
+              <button
+                type="button"
+                onClick={handleRemoveAvatar}
+                disabled={isRemovingAvatar}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+              >
+                {isRemovingAvatar ? (
+                  <LoaderCircle size={16} className="animate-spin" />
+                ) : (
+                  <Trash2 size={16} />
+                )}
+                {isRemovingAvatar
+                  ? "Removing..."
+                  : formData.avatarPublicId && formData.avatarPublicId !== originalAvatar.publicId
+                  ? "Remove uploaded avatar"
+                  : "Clear avatar"}
+              </button>
+            ) : null}
           </div>
         </div>
 

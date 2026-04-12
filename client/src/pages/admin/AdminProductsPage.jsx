@@ -1,6 +1,6 @@
 import { createColumnHelper } from "@tanstack/react-table";
-import { ImagePlus, PencilLine, Plus, Search, SlidersHorizontal, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { LoaderCircle, PencilLine, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
 
@@ -9,7 +9,11 @@ import AppModal from "../../components/common/AppModal";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import PaginationControls from "../../components/common/PaginationControls";
 import StatusMessage from "../../components/common/StatusMessage";
-import { clearUploadedImage, uploadAdminImage } from "../../features/admin/adminSlice";
+import {
+  clearUploadedImage,
+  deleteAdminImage,
+  uploadAdminImage,
+} from "../../features/admin/adminSlice";
 import { fetchCategories } from "../../features/categories/categorySlice";
 import {
   createProduct,
@@ -47,11 +51,15 @@ function AdminProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [isRemovingImage, setIsRemovingImage] = useState(false);
+  const [originalImage, setOriginalImage] = useState({ url: "", publicId: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOption, setSortOption] = useState("newest");
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
+  const productImageInputRef = useRef(null);
 
   useEffect(() => {
     dispatch(fetchCategories());
@@ -82,10 +90,36 @@ function AdminProductsPage() {
 
   const resetForm = () => {
     setEditingProductId(null);
+    setOriginalImage({ url: "", publicId: "" });
     setFormData(initialFormState);
+    if (productImageInputRef.current) {
+      productImageInputRef.current.value = "";
+    }
   };
 
-  const closeModal = () => {
+  const removeTemporaryImage = async (publicId) => {
+    if (!publicId) {
+      return true;
+    }
+
+    const result = await dispatch(deleteAdminImage(publicId));
+
+    if (deleteAdminImage.rejected.match(result)) {
+      toast.error(result.payload || "Failed to remove image.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const closeModal = async () => {
+    if (
+      formData.imagePublicId &&
+      formData.imagePublicId !== originalImage.publicId
+    ) {
+      await removeTemporaryImage(formData.imagePublicId);
+    }
+
     setIsModalOpen(false);
     resetForm();
   };
@@ -97,6 +131,10 @@ function AdminProductsPage() {
 
   const startEditing = (product) => {
     setEditingProductId(product._id);
+    setOriginalImage({
+      url: product.images?.[0]?.url || "",
+      publicId: product.images?.[0]?.publicId || "",
+    });
     setFormData({
       name: product.name,
       description: product.description,
@@ -194,11 +232,74 @@ function AdminProductsPage() {
       return;
     }
 
-    await dispatch(uploadAdminImage({ file, folder: "haker-ecommerce/products" }));
+    const previousTemporaryPublicId =
+      formData.imagePublicId && formData.imagePublicId !== originalImage.publicId
+        ? formData.imagePublicId
+        : "";
+
+    const result = await dispatch(
+      uploadAdminImage({ file, folder: "haker-ecommerce/products" })
+    );
+
+    if (uploadAdminImage.rejected.match(result)) {
+      toast.error(result.payload || "Failed to upload image.");
+      return;
+    }
+
+    if (previousTemporaryPublicId) {
+      await removeTemporaryImage(previousTemporaryPublicId);
+    }
+
+    if (productImageInputRef.current) {
+      productImageInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (!formData.imagePublicId) {
+      return;
+    }
+
+    setIsRemovingImage(true);
+
+    if (formData.imagePublicId !== originalImage.publicId) {
+      const removed = await removeTemporaryImage(formData.imagePublicId);
+
+      if (!removed) {
+        setIsRemovingImage(false);
+        return;
+      }
+    }
+
+    if (originalImage.publicId && formData.imagePublicId !== originalImage.publicId) {
+      setFormData((current) => ({
+        ...current,
+        imageUrl: originalImage.url,
+        imagePublicId: originalImage.publicId,
+      }));
+      if (productImageInputRef.current) {
+        productImageInputRef.current.value = "";
+      }
+      toast.success("Reverted to the original product image.");
+      setIsRemovingImage(false);
+      return;
+    }
+
+    setFormData((current) => ({
+      ...current,
+      imageUrl: "",
+      imagePublicId: "",
+    }));
+    if (productImageInputRef.current) {
+      productImageInputRef.current.value = "";
+    }
+    toast.success("Image removed.");
+    setIsRemovingImage(false);
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsSavingProduct(true);
 
     const payload = {
       name: formData.name,
@@ -219,8 +320,12 @@ function AdminProductsPage() {
 
     if (updateProduct.fulfilled.match(result) || createProduct.fulfilled.match(result)) {
       toast.success(editingProductId ? "Product updated." : "Product created.");
-      closeModal();
+      await closeModal();
+    } else {
+      toast.error(result.payload || "Failed to save product.");
     }
+
+    setIsSavingProduct(false);
   };
 
   const confirmDelete = async () => {
@@ -356,17 +461,39 @@ function AdminProductsPage() {
 
           <div className="panel-muted space-y-3 p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-white/80">
-              <ImagePlus size={16} />
+              <Upload size={16} />
               Upload product image
             </div>
-            <input type="file" accept="image/*" onChange={handleImageUpload} className="field" />
-            {uploadLoading ? <p className="text-sm text-white/50">Uploading...</p> : null}
+            <input
+              ref={productImageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="field"
+            />
+            {uploadLoading ? <p className="text-sm text-white/50">Uploading image...</p> : null}
+            {isRemovingImage ? <p className="text-sm text-white/50">Removing image...</p> : null}
           </div>
 
           <input name="imageUrl" value={formData.imageUrl} onChange={handleChange} placeholder="Cloudinary image URL" className="field" required />
 
           {formData.imageUrl ? (
-            <img src={formData.imageUrl} alt="Preview" className="h-44 w-full rounded-[10px] object-cover" />
+            <div className="space-y-3">
+              <img src={formData.imageUrl} alt="Preview" className="h-44 w-full rounded-[10px] object-cover" />
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                disabled={isRemovingImage}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/10"
+              >
+                <X size={16} />
+                {isRemovingImage
+                  ? "Removing..."
+                  : formData.imagePublicId && formData.imagePublicId !== originalImage.publicId
+                  ? "Remove uploaded image"
+                  : "Clear image selection"}
+              </button>
+            </div>
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -382,8 +509,19 @@ function AdminProductsPage() {
 
           <div className="flex justify-end gap-3">
             <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
-            <button type="submit" className="btn-primary">
-              {editingProductId ? "Save Changes" : "Create Product"}
+            <button
+              type="submit"
+              disabled={isSavingProduct}
+              className="btn-primary gap-2 disabled:cursor-not-allowed"
+            >
+              {isSavingProduct ? <LoaderCircle size={16} className="animate-spin" /> : null}
+              {isSavingProduct
+                ? editingProductId
+                  ? "Saving..."
+                  : "Creating..."
+                : editingProductId
+                  ? "Save Changes"
+                  : "Create Product"}
             </button>
           </div>
         </form>

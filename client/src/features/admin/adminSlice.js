@@ -144,6 +144,20 @@ export const uploadAdminImage = createAsyncThunk(
   }
 );
 
+export const deleteAdminImage = createAsyncThunk(
+  "admin/deleteAdminImage",
+  async (publicId, thunkAPI) => {
+    try {
+      await api.delete("/uploads/image", {
+        data: { publicId },
+      });
+      return publicId;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
 const initialState = {
   stats: null,
   users: [],
@@ -218,18 +232,27 @@ const adminSlice = createSlice({
         state.uploadLoading = false;
         state.uploadedImage = action.payload;
       })
+      .addCase(deleteAdminImage.fulfilled, (state, action) => {
+        state.uploadLoading = false;
+        if (state.uploadedImage?.publicId === action.payload) {
+          state.uploadedImage = null;
+        }
+      })
       .addMatcher(
         (action) =>
           action.type.startsWith("admin/") &&
           action.type.endsWith("/pending") &&
-          action.type !== "admin/uploadAdminImage/pending",
+          action.type !== "admin/uploadAdminImage/pending" &&
+          action.type !== "admin/deleteAdminImage/pending",
         (state) => {
           state.isLoading = true;
           state.error = null;
         }
       )
       .addMatcher(
-        (action) => action.type === "admin/uploadAdminImage/pending",
+        (action) =>
+          action.type === "admin/uploadAdminImage/pending" ||
+          action.type === "admin/deleteAdminImage/pending",
         (state) => {
           state.uploadLoading = true;
           state.error = null;
@@ -239,14 +262,17 @@ const adminSlice = createSlice({
         (action) =>
           action.type.startsWith("admin/") &&
           action.type.endsWith("/rejected") &&
-          action.type !== "admin/uploadAdminImage/rejected",
+          action.type !== "admin/uploadAdminImage/rejected" &&
+          action.type !== "admin/deleteAdminImage/rejected",
         (state, action) => {
           state.isLoading = false;
           state.error = action.payload;
         }
       )
       .addMatcher(
-        (action) => action.type === "admin/uploadAdminImage/rejected",
+        (action) =>
+          action.type === "admin/uploadAdminImage/rejected" ||
+          action.type === "admin/deleteAdminImage/rejected",
         (state, action) => {
           state.uploadLoading = false;
           state.error = action.payload;
