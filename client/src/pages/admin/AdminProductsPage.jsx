@@ -112,8 +112,9 @@ function AdminProductsPage() {
     return true;
   };
 
-  const closeModal = async () => {
+  const closeModal = async ({ cleanupTemporaryImage = true } = {}) => {
     if (
+      cleanupTemporaryImage &&
       formData.imagePublicId &&
       formData.imagePublicId !== originalImage.publicId
     ) {
@@ -320,7 +321,7 @@ function AdminProductsPage() {
 
     if (updateProduct.fulfilled.match(result) || createProduct.fulfilled.match(result)) {
       toast.success(editingProductId ? "Product updated." : "Product created.");
-      await closeModal();
+      await closeModal({ cleanupTemporaryImage: false });
     } else {
       toast.error(result.payload || "Failed to save product.");
     }

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -31,7 +31,7 @@
   --page-linear-start: #0b0f15;
   --page-linear-end: #11151c;
 
-  font-family: "Manrope", system-ui, sans-serif;
+  font-family: "Poppins", system-ui, sans-serif;
   background:
     radial-gradient(circle at top, var(--page-radial), transparent 30%),
     linear-gradient(180deg, var(--page-linear-start) 0%, var(--page-linear-end) 100%);
@@ -109,4 +109,13 @@ select {
   .btn-secondary {
     @apply inline-flex items-center justify-center rounded-[10px] border border-white/10 bg-transparent px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-accent-500/50 hover:text-white;
   }
+}
+
+.homepage-featured-swiper .swiper-pagination-bullet {
+  background: rgba(124, 92, 255, 0.28);
+  opacity: 1;
+}
+
+.homepage-featured-swiper .swiper-pagination-bullet-active {
+  background: rgb(109 40 217);
 }
