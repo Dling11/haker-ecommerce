@@ -12,6 +12,7 @@ function RegisterPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isLoading, error } = useSelector((state) => state.auth);
+  const { settings } = useSelector((state) => state.site);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -20,6 +21,8 @@ function RegisterPage() {
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const isCustomerRegistrationDisabled = settings?.allowCustomerRegistration === false;
+  const isMaintenanceMode = settings?.maintenanceMode === true;
 
   const handleChange = (event) => {
     setFormData((current) => ({
@@ -52,6 +55,15 @@ function RegisterPage() {
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">
         <StatusMessage type="error" message={error} />
+        {isCustomerRegistrationDisabled ? (
+          <StatusMessage
+            type="info"
+            message="Customer registration is currently disabled. Please try again later."
+          />
+        ) : null}
+        {isMaintenanceMode ? (
+          <StatusMessage type="info" message={settings.maintenanceMessage} />
+        ) : null}
 
         <label className="block space-y-2">
           <span className="text-sm font-semibold text-white/80">Full name</span>
@@ -115,7 +127,7 @@ function RegisterPage() {
 
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || isCustomerRegistrationDisabled || isMaintenanceMode}
           className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-white px-5 py-3 font-semibold text-[#11151c] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:bg-white/40"
         >
           {isLoading ? (

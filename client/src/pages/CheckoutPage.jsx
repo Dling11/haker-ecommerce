@@ -13,6 +13,7 @@ function CheckoutPage() {
   const { cart } = useSelector((state) => state.cart);
   const { user } = useSelector((state) => state.auth);
   const { isLoading, error, latestOrder } = useSelector((state) => state.orders);
+  const { settings } = useSelector((state) => state.site);
 
   const [formData, setFormData] = useState({
     fullName: user?.shippingAddress?.fullName || user?.name || "",
@@ -26,6 +27,10 @@ function CheckoutPage() {
     gcashReference: "",
     notes: "",
   });
+  const isCheckoutDisabled = settings?.allowCheckout === false;
+  const isMaintenanceMode = settings?.maintenanceMode === true;
+  const isCodDisabled = settings?.allowCashOnDelivery === false;
+  const isGCashDisabled = settings?.allowGCash === false;
 
   useEffect(() => {
     if (latestOrder) {
@@ -33,6 +38,22 @@ function CheckoutPage() {
       dispatch(clearLatestOrder());
     }
   }, [dispatch, latestOrder, navigate]);
+
+  useEffect(() => {
+    if (formData.paymentMethod === "cod" && isCodDisabled && !isGCashDisabled) {
+      setFormData((current) => ({
+        ...current,
+        paymentMethod: "gcash",
+      }));
+    }
+
+    if (formData.paymentMethod === "gcash" && isGCashDisabled && !isCodDisabled) {
+      setFormData((current) => ({
+        ...current,
+        paymentMethod: "cod",
+      }));
+    }
+  }, [formData.paymentMethod, isCodDisabled, isGCashDisabled]);
 
   const handleChange = (event) => {
     setFormData((current) => ({
@@ -86,6 +107,12 @@ function CheckoutPage() {
         </div>
 
         <StatusMessage type="error" message={error} />
+        {isCheckoutDisabled ? (
+          <StatusMessage type="info" message="Checkout is currently unavailable." />
+        ) : null}
+        {isMaintenanceMode ? (
+          <StatusMessage type="info" message={settings.maintenanceMessage} />
+        ) : null}
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="space-y-2">
@@ -128,11 +155,25 @@ function CheckoutPage() {
         <div className="space-y-3">
           <p className="text-sm font-semibold text-slate-700">Payment method</p>
           <label className="flex items-center gap-3 rounded-[10px] border border-violet-100 bg-violet-50/60 px-4 py-3">
-            <input type="radio" name="paymentMethod" value="cod" checked={formData.paymentMethod === "cod"} onChange={handleChange} />
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="cod"
+              checked={formData.paymentMethod === "cod"}
+              onChange={handleChange}
+              disabled={isCodDisabled}
+            />
             <span>Cash on Delivery</span>
           </label>
           <label className="flex items-center gap-3 rounded-[10px] border border-violet-100 bg-violet-50/60 px-4 py-3">
-            <input type="radio" name="paymentMethod" value="gcash" checked={formData.paymentMethod === "gcash"} onChange={handleChange} />
+            <input
+              type="radio"
+              name="paymentMethod"
+              value="gcash"
+              checked={formData.paymentMethod === "gcash"}
+              onChange={handleChange}
+              disabled={isGCashDisabled}
+            />
             <span>GCash (simulated manual payment)</span>
           </label>
         </div>
@@ -149,7 +190,18 @@ function CheckoutPage() {
           <textarea name="notes" value={formData.notes} onChange={handleChange} rows="4" className="field" placeholder="Optional notes for delivery or payment" />
         </label>
 
-        <button type="submit" disabled={isLoading || cart.items.length === 0} className="w-full rounded-[10px] bg-violet-600 px-5 py-3 font-semibold text-white">
+        <button
+          type="submit"
+          disabled={
+            isLoading ||
+            cart.items.length === 0 ||
+            isCheckoutDisabled ||
+            isMaintenanceMode ||
+            (formData.paymentMethod === "cod" && isCodDisabled) ||
+            (formData.paymentMethod === "gcash" && isGCashDisabled)
+          }
+          className="w-full rounded-[10px] bg-violet-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
           {isLoading ? "Placing order..." : "Place Order"}
         </button>
       </form>

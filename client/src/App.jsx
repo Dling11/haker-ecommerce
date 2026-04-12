@@ -22,6 +22,7 @@ const AdminOrdersPage = lazy(() => import("./pages/admin/AdminOrdersPage"));
 const AdminProductsPage = lazy(() => import("./pages/admin/AdminProductsPage"));
 const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
 const AdminCategoriesPage = lazy(() => import("./pages/admin/AdminCategoriesPage"));
+const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
 
 function AppFallback() {
   return (
@@ -62,6 +63,7 @@ function App() {
           <Route path="categories" element={<AdminCategoriesPage />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="orders" element={<AdminOrdersPage />} />
+          <Route path="settings" element={<AdminSettingsPage />} />
         </Route>
       </Route>
     </Routes>

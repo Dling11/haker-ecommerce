@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
+const { getSiteSettings } = require("../utils/siteSettings");
 
 const protect = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -24,6 +25,23 @@ const protect = asyncHandler(async (req, res, next) => {
   if (!user) {
     res.status(401);
     throw new Error("User no longer exists.");
+  }
+
+  if (user.status === "banned") {
+    res.status(403);
+    throw new Error("This account has been banned. Please contact support.");
+  }
+
+  if (user.status === "inactive") {
+    res.status(403);
+    throw new Error("This account is inactive. Please contact support.");
+  }
+
+  const settings = await getSiteSettings();
+
+  if (user.role !== "admin" && settings.maintenanceMode) {
+    res.status(503);
+    throw new Error(settings.maintenanceMessage);
   }
 
   req.user = user;

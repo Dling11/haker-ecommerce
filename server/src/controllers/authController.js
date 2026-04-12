@@ -2,6 +2,7 @@ const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const asyncHandler = require("../utils/asyncHandler");
 const { deleteCloudinaryImage } = require("../utils/cloudinaryAsset");
+const { getSiteSettings } = require("../utils/siteSettings");
 
 const buildUserPayload = (user) => ({
   _id: user._id,
@@ -26,6 +27,7 @@ const setAuthCookie = (res, token) => {
 
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password, phone } = req.body;
+  const settings = await getSiteSettings();
 
   const existingUser = await User.findOne({ email: email.toLowerCase() });
 
@@ -35,6 +37,11 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const usersCount = await User.countDocuments();
+
+  if (usersCount > 0 && !settings.allowCustomerRegistration) {
+    res.status(403);
+    throw new Error("Customer registration is currently disabled.");
+  }
 
   const user = await User.create({
     name,
@@ -57,6 +64,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const settings = await getSiteSettings();
 
   const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
 
@@ -80,6 +88,16 @@ const loginUser = asyncHandler(async (req, res) => {
   if (user.status === "inactive") {
     res.status(403);
     throw new Error("This account is inactive. Please contact support.");
+  }
+
+  if (user.role !== "admin" && settings.maintenanceMode) {
+    res.status(503);
+    throw new Error(settings.maintenanceMessage);
+  }
+
+  if (user.role !== "admin" && !settings.allowCustomerLogin) {
+    res.status(403);
+    throw new Error("Login is temporarily unavailable. Please try again later.");
   }
 
   const token = generateToken(user._id);

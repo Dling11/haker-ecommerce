@@ -16,6 +16,7 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
+  const { settings } = useSelector((state) => state.site);
   const { isLoading } = useSelector((state) => state.cart);
   const { selectedProduct, detailLoading, reviewLoading } = useSelector((state) => state.products);
   const [quantity, setQuantity] = useState(1);
@@ -216,6 +217,11 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
             )}
 
             <form onSubmit={handleReviewSubmit} className="space-y-3 rounded-[10px] bg-slate-50 p-4">
+              {settings?.allowReviews === false ? (
+                <p className="text-sm text-slate-500">
+                  Reviews are temporarily disabled by the store.
+                </p>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-[140px_1fr]">
                 <label className="block space-y-2">
                   <span className="text-sm font-semibold text-slate-700">Rating</span>
@@ -257,7 +263,7 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
 
               <button
                 type="submit"
-                disabled={reviewLoading}
+                disabled={reviewLoading || settings?.allowReviews === false}
                 className="inline-flex items-center justify-center rounded-[10px] border border-violet-200 px-4 py-3 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:text-slate-400"
               >
                 {reviewLoading ? "Submitting..." : "Submit Review"}

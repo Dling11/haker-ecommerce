@@ -15,6 +15,30 @@ export const fetchDashboardStats = createAsyncThunk(
   }
 );
 
+export const fetchAdminSiteSettings = createAsyncThunk(
+  "admin/fetchAdminSiteSettings",
+  async (_, thunkAPI) => {
+    try {
+      const { data } = await api.get("/admin/settings");
+      return data.settings;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const updateAdminSiteSettings = createAsyncThunk(
+  "admin/updateAdminSiteSettings",
+  async (payload, thunkAPI) => {
+    try {
+      const { data } = await api.put("/admin/settings", payload);
+      return data.settings;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
 export const fetchUsers = createAsyncThunk("admin/fetchUsers", async (params = {}, thunkAPI) => {
   try {
     const { data } = await api.get("/users", { params });
@@ -160,6 +184,7 @@ export const deleteAdminImage = createAsyncThunk(
 
 const initialState = {
   stats: null,
+  siteSettings: null,
   users: [],
   usersPagination: null,
   orders: [],
@@ -183,6 +208,14 @@ const adminSlice = createSlice({
       .addCase(fetchDashboardStats.fulfilled, (state, action) => {
         state.isLoading = false;
         state.stats = action.payload;
+      })
+      .addCase(fetchAdminSiteSettings.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.siteSettings = action.payload;
+      })
+      .addCase(updateAdminSiteSettings.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.siteSettings = action.payload;
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.isLoading = false;

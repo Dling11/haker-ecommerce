@@ -10,6 +10,7 @@ const links = [
   { to: "/admin/categories", label: "Categories" },
   { to: "/admin/users", label: "Users" },
   { to: "/admin/orders", label: "Orders" },
+  { to: "/admin/settings", label: "Settings" },
 ];
 
 function AdminSidebar() {

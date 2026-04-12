@@ -1,8 +1,11 @@
 import { Outlet } from "react-router-dom";
 
+import AppBootstrap from "../components/common/AppBootstrap";
+
 function AuthLayout() {
   return (
     <div className="min-h-screen bg-[#13161d] text-white">
+      <AppBootstrap />
       <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
         <section className="relative hidden overflow-hidden lg:flex">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(168,85,247,0.14),transparent_26%),radial-gradient(circle_at_50%_100%,rgba(34,197,94,0.12),transparent_28%),linear-gradient(135deg,#11151d_0%,#181d26_48%,#0e1117_100%)]" />

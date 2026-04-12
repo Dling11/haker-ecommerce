@@ -3,6 +3,7 @@ const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
+const { getSiteSettings } = require("../utils/siteSettings");
 
 const calculateTotals = (orderItems) => {
   const itemsPrice = Number(
@@ -17,7 +18,23 @@ const calculateTotals = (orderItems) => {
 
 const createOrder = asyncHandler(async (req, res) => {
   const { shippingAddress, paymentMethod, gcashReference, notes } = req.body;
+  const settings = await getSiteSettings();
   const cart = await Cart.findOne({ user: req.user._id });
+
+  if (!settings.allowCheckout) {
+    res.status(403);
+    throw new Error("Checkout is currently unavailable.");
+  }
+
+  if (paymentMethod === "cod" && !settings.allowCashOnDelivery) {
+    res.status(403);
+    throw new Error("Cash on Delivery is currently unavailable.");
+  }
+
+  if (paymentMethod === "gcash" && !settings.allowGCash) {
+    res.status(403);
+    throw new Error("GCash payments are currently unavailable.");
+  }
 
   if (!cart || cart.items.length === 0) {
     res.status(400);

@@ -2,6 +2,7 @@ const Product = require("../models/Product");
 const Category = require("../models/Category");
 const asyncHandler = require("../utils/asyncHandler");
 const { deleteCloudinaryImage } = require("../utils/cloudinaryAsset");
+const { getSiteSettings } = require("../utils/siteSettings");
 
 const buildSlug = (value) =>
   value
@@ -95,7 +96,13 @@ const getProductById = asyncHandler(async (req, res) => {
 
 const addProductReview = asyncHandler(async (req, res) => {
   const { rating, comment } = req.body;
+  const settings = await getSiteSettings();
   const product = await Product.findById(req.params.id);
+
+  if (!settings.allowReviews) {
+    res.status(403);
+    throw new Error("Reviews are currently disabled.");
+  }
 
   if (!product) {
     res.status(404);

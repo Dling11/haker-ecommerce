@@ -13,12 +13,15 @@ function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isLoading, error } = useSelector((state) => state.auth);
+  const { settings } = useSelector((state) => state.site);
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const isCustomerLoginDisabled = settings?.allowCustomerLogin === false;
+  const isMaintenanceMode = settings?.maintenanceMode === true;
 
   const redirectPath = location.state?.from?.pathname;
 
@@ -53,6 +56,15 @@ function LoginPage() {
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">
         <StatusMessage type="error" message={error} />
+        {isCustomerLoginDisabled ? (
+          <StatusMessage
+            type="info"
+            message="Login is temporarily unavailable. Please try again later."
+          />
+        ) : null}
+        {isMaintenanceMode ? (
+          <StatusMessage type="info" message={settings.maintenanceMessage} />
+        ) : null}
 
         <label className="block space-y-2">
           <span className="text-sm font-semibold text-white/80">Email</span>
