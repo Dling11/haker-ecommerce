@@ -37,6 +37,11 @@ const protect = asyncHandler(async (req, res, next) => {
     throw new Error("This account is inactive. Please contact support.");
   }
 
+  if (user.role !== "admin" && !user.isEmailVerified) {
+    res.status(403);
+    throw new Error("Please verify your email before continuing.");
+  }
+
   const settings = await getSiteSettings();
 
   if (user.role !== "admin" && settings.maintenanceMode) {

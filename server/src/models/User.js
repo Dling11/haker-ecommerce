@@ -46,6 +46,29 @@ const userSchema = new mongoose.Schema(
       enum: ["active", "inactive", "banned"],
       default: "active",
     },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerifiedAt: {
+      type: Date,
+      default: null,
+    },
+    emailVerificationOtpHash: {
+      type: String,
+      default: "",
+      select: false,
+    },
+    emailVerificationOtpExpiresAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    emailVerificationOtpLastSentAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
     phone: {
       type: String,
       trim: true,

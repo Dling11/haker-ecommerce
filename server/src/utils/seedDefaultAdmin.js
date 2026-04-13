@@ -20,6 +20,8 @@ const seedDefaultAdmin = async () => {
     email: adminEmail.toLowerCase(),
     password: adminPassword,
     role: "admin",
+    isEmailVerified: true,
+    emailVerifiedAt: new Date(),
   });
 
   console.log(`Default admin created for ${adminEmail}`);

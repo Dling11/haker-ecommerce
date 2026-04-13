@@ -4,6 +4,7 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const { getSiteSettings } = require("../utils/siteSettings");
+const { sendOrderConfirmationEmail } = require("../services/emailService");
 
 const calculateTotals = (orderItems) => {
   const itemsPrice = Number(
@@ -83,6 +84,18 @@ const createOrder = asyncHandler(async (req, res) => {
   cart.items = [];
   cart.itemsPrice = 0;
   await cart.save();
+
+  if (req.user.isEmailVerified) {
+    try {
+      await sendOrderConfirmationEmail({
+        to: req.user.email,
+        user: req.user,
+        order,
+      });
+    } catch (error) {
+      console.error("Failed to send order confirmation email:", error.message);
+    }
+  }
 
   res.status(201).json({
     success: true,
@@ -172,11 +185,41 @@ const createAdminOrder = asyncHandler(async (req, res) => {
 });
 
 const getMyOrders = asyncHandler(async (req, res) => {
-  const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
+  const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 }).lean();
+  const productIds = [
+    ...new Set(
+      orders.flatMap((order) => order.orderItems.map((item) => item.product?.toString()).filter(Boolean))
+    ),
+  ];
+
+  const products = await Product.find({ _id: { $in: productIds } })
+    .select("_id stock isPublished")
+    .lean();
+  const productMap = new Map(products.map((product) => [product._id.toString(), product]));
+
+  const normalizedOrders = orders.map((order) => {
+    const orderItems = order.orderItems.map((item) => {
+      const currentProduct = productMap.get(item.product?.toString());
+      const availableQuantity =
+        currentProduct && currentProduct.isPublished ? currentProduct.stock : 0;
+
+      return {
+        ...item,
+        isAvailable: availableQuantity > 0,
+        availableQuantity,
+      };
+    });
+
+    return {
+      ...order,
+      orderItems,
+      canReorder: orderItems.some((item) => item.isAvailable),
+    };
+  });
 
   res.status(200).json({
     success: true,
-    orders,
+    orders: normalizedOrders,
   });
 });
 

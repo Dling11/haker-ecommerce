@@ -7,6 +7,9 @@ import StatusMessage from "../components/common/StatusMessage";
 import { clearLatestOrder, createOrder } from "../features/orders/orderSlice";
 import { formatCurrency } from "../utils/formatCurrency";
 
+const checkoutFieldClassName =
+  "w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100";
+
 function CheckoutPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -117,38 +120,82 @@ function CheckoutPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Full name</span>
-            <input name="fullName" value={formData.fullName} onChange={handleChange} className="field" required  />
+            <input
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleChange}
+              className={checkoutFieldClassName}
+              required
+            />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Phone</span>
-            <input name="phone" value={formData.phone} onChange={handleChange} className="field" required />
+            <input
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              className={checkoutFieldClassName}
+              required
+            />
           </label>
         </div>
 
         <label className="space-y-2 block">
           <span className="text-sm font-semibold text-slate-700">Street</span>
-          <input name="street" value={formData.street} onChange={handleChange} className="field" required placeholder="Enter street address" />
+          <input
+            name="street"
+            value={formData.street}
+            onChange={handleChange}
+            className={checkoutFieldClassName}
+            required
+            placeholder="Enter street address"
+          />
         </label>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">City</span>
-            <input name="city" value={formData.city} onChange={handleChange} className="field" required placeholder="Enter city" />
+            <input
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+              className={checkoutFieldClassName}
+              required
+              placeholder="Enter city"
+            />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Province / State</span>
-            <input name="state" value={formData.state} onChange={handleChange} className="field" placeholder="Enter province or state" />
+            <input
+              name="state"
+              value={formData.state}
+              onChange={handleChange}
+              className={checkoutFieldClassName}
+              placeholder="Enter province or state"
+            />
           </label>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Postal code</span>
-            <input name="postalCode" value={formData.postalCode} onChange={handleChange} className="field" placeholder="Enter postal code" />
+            <input
+              name="postalCode"
+              value={formData.postalCode}
+              onChange={handleChange}
+              className={checkoutFieldClassName}
+              placeholder="Enter postal code"
+            />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-semibold text-slate-700">Country</span>
-            <input name="country" value={formData.country} onChange={handleChange} className="field" placeholder="Enter country" />
+            <input
+              name="country"
+              value={formData.country}
+              onChange={handleChange}
+              className={checkoutFieldClassName}
+              placeholder="Enter country"
+            />
           </label>
         </div>
 
@@ -181,13 +228,27 @@ function CheckoutPage() {
         {formData.paymentMethod === "gcash" ? (
           <label className="space-y-2 block">
             <span className="text-sm font-semibold text-slate-700">GCash reference</span>
-            <input name="gcashReference" value={formData.gcashReference} onChange={handleChange} className="field" placeholder="Reference number or screenshot id" required />
+            <input
+              name="gcashReference"
+              value={formData.gcashReference}
+              onChange={handleChange}
+              className={checkoutFieldClassName}
+              placeholder="Reference number or screenshot id"
+              required
+            />
           </label>
         ) : null}
 
         <label className="space-y-2 block">
           <span className="text-sm font-semibold text-slate-700">Order notes</span>
-          <textarea name="notes" value={formData.notes} onChange={handleChange} rows="4" className="field" placeholder="Optional notes for delivery or payment" />
+          <textarea
+            name="notes"
+            value={formData.notes}
+            onChange={handleChange}
+            rows="4"
+            className={checkoutFieldClassName}
+            placeholder="Optional notes for delivery or payment"
+          />
         </label>
 
         <button

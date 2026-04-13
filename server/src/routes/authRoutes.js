@@ -4,6 +4,8 @@ const { body } = require("express-validator");
 const {
   registerUser,
   loginUser,
+  verifyEmail,
+  resendVerificationOtp,
   getCurrentUser,
   updateProfile,
   logoutUser,
@@ -34,6 +36,24 @@ router.post(
   ],
   validateRequest,
   loginUser
+);
+router.post(
+  "/verify-email",
+  [
+    body("email").isEmail().withMessage("A valid email is required."),
+    body("otp")
+      .trim()
+      .matches(/^\d{6}$/)
+      .withMessage("Verification code must be 6 digits."),
+  ],
+  validateRequest,
+  verifyEmail
+);
+router.post(
+  "/resend-verification-otp",
+  [body("email").isEmail().withMessage("A valid email is required.")],
+  validateRequest,
+  resendVerificationOtp
 );
 
 router.post("/logout", logoutUser);

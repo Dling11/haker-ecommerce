@@ -36,6 +36,30 @@ export const loginUser = createAsyncThunk(
   }
 );
 
+export const verifyEmail = createAsyncThunk(
+  "auth/verifyEmail",
+  async ({ email, otp }, thunkAPI) => {
+    try {
+      const { data } = await api.post("/auth/verify-email", { email, otp });
+      return data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const resendVerificationOtp = createAsyncThunk(
+  "auth/resendVerificationOtp",
+  async ({ email }, thunkAPI) => {
+    try {
+      const { data } = await api.post("/auth/resend-verification-otp", { email });
+      return data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
 export const fetchCurrentUser = createAsyncThunk(
   "auth/fetchCurrentUser",
   async (_, thunkAPI) => {
@@ -75,6 +99,7 @@ export const logoutUser = createAsyncThunk(
 const initialState = {
   user: initialPersistedState.user,
   token: initialPersistedState.token,
+  pendingVerificationEmail: null,
   isLoading: false,
   isInitialized: false,
   error: null,
@@ -92,6 +117,7 @@ const authSlice = createSlice({
     clearCredentials: (state) => {
       state.user = null;
       state.token = null;
+      state.pendingVerificationEmail = null;
       localStorage.removeItem("haker-ecommerce-auth");
     },
   },
@@ -100,8 +126,17 @@ const authSlice = createSlice({
       .addCase(registerUser.fulfilled, (state, action) => {
         state.isLoading = false;
         state.isInitialized = true;
+        if (action.payload.requiresEmailVerification) {
+          state.user = null;
+          state.token = null;
+          state.pendingVerificationEmail = action.payload.email;
+          localStorage.removeItem("haker-ecommerce-auth");
+          return;
+        }
+
         state.user = action.payload.user;
         state.token = action.payload.token;
+        state.pendingVerificationEmail = null;
         localStorage.setItem(
           "haker-ecommerce-auth",
           JSON.stringify({
@@ -115,6 +150,7 @@ const authSlice = createSlice({
         state.isInitialized = true;
         state.user = action.payload.user;
         state.token = action.payload.token;
+        state.pendingVerificationEmail = null;
         localStorage.setItem(
           "haker-ecommerce-auth",
           JSON.stringify({
@@ -122,6 +158,24 @@ const authSlice = createSlice({
             token: action.payload.token,
           })
         );
+      })
+      .addCase(verifyEmail.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isInitialized = true;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.pendingVerificationEmail = null;
+        localStorage.setItem(
+          "haker-ecommerce-auth",
+          JSON.stringify({
+            user: action.payload.user,
+            token: action.payload.token,
+          })
+        );
+      })
+      .addCase(resendVerificationOtp.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.pendingVerificationEmail = action.payload.email || state.pendingVerificationEmail;
       })
       .addCase(fetchCurrentUser.fulfilled, (state, action) => {
         state.isLoading = false;
@@ -151,6 +205,7 @@ const authSlice = createSlice({
         state.isInitialized = true;
         state.user = null;
         state.token = null;
+        state.pendingVerificationEmail = null;
         localStorage.removeItem("haker-ecommerce-auth");
       })
       .addMatcher(

@@ -3,6 +3,18 @@ const generateToken = require("../utils/generateToken");
 const asyncHandler = require("../utils/asyncHandler");
 const { deleteCloudinaryImage } = require("../utils/cloudinaryAsset");
 const { getSiteSettings } = require("../utils/siteSettings");
+const {
+  OTP_EXPIRY_MINUTES,
+  OTP_RESEND_COOLDOWN_SECONDS,
+  assignEmailVerificationOtp,
+  clearEmailVerificationOtp,
+  getOtpResendCooldownRemaining,
+  isOtpExpired,
+  isOtpValid,
+} = require("../utils/emailOtp");
+const {
+  sendVerificationOtpEmail,
+} = require("../services/emailService");
 
 const buildUserPayload = (user) => ({
   _id: user._id,
@@ -10,6 +22,7 @@ const buildUserPayload = (user) => ({
   email: user.email,
   role: user.role,
   status: user.status,
+  isEmailVerified: user.isEmailVerified,
   phone: user.phone,
   avatar: user.avatar,
   shippingAddress: user.shippingAddress,
@@ -37,8 +50,9 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const usersCount = await User.countDocuments();
+  const role = usersCount === 0 ? "admin" : "customer";
 
-  if (usersCount > 0 && !settings.allowCustomerRegistration) {
+  if (role !== "admin" && !settings.allowCustomerRegistration) {
     res.status(403);
     throw new Error("Customer registration is currently disabled.");
   }
@@ -48,17 +62,50 @@ const registerUser = asyncHandler(async (req, res) => {
     email: email.toLowerCase(),
     password,
     phone,
-    role: usersCount === 0 ? "admin" : "customer",
+    role,
+    isEmailVerified: role === "admin",
+    emailVerifiedAt: role === "admin" ? new Date() : null,
   });
 
-  const token = generateToken(user._id);
-  setAuthCookie(res, token);
+  if (role === "admin") {
+    const token = generateToken(user._id);
+    setAuthCookie(res, token);
+
+    res.status(201).json({
+      success: true,
+      message: "Registration successful.",
+      user: buildUserPayload(user),
+      token,
+    });
+    return;
+  }
+
+  const otp = assignEmailVerificationOtp(user);
+  await user.save();
+
+  let emailSent = false;
+
+  try {
+    await sendVerificationOtpEmail({
+      to: user.email,
+      name: user.name,
+      otp,
+      expiryMinutes: OTP_EXPIRY_MINUTES,
+    });
+    emailSent = true;
+  } catch (error) {
+    console.error("Failed to send verification OTP email:", error.message);
+  }
 
   res.status(201).json({
     success: true,
-    message: "Registration successful.",
-    user: buildUserPayload(user),
-    token,
+    message: emailSent
+      ? "Account created. Please verify your email to continue."
+      : "Account created. We could not send the verification email right away, but you can request a new code.",
+    requiresEmailVerification: true,
+    email: user.email,
+    emailSent,
+    resendCooldownSeconds: OTP_RESEND_COOLDOWN_SECONDS,
   });
 });
 
@@ -90,6 +137,11 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new Error("This account is inactive. Please contact support.");
   }
 
+  if (user.role !== "admin" && !user.isEmailVerified) {
+    res.status(403);
+    throw new Error("Please verify your email before logging in.");
+  }
+
   if (user.role !== "admin" && settings.maintenanceMode) {
     res.status(503);
     throw new Error(settings.maintenanceMessage);
@@ -108,6 +160,109 @@ const loginUser = asyncHandler(async (req, res) => {
     message: "Login successful.",
     user: buildUserPayload(user),
     token,
+  });
+});
+
+const verifyEmail = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  const user = await User.findOne({ email: email.toLowerCase() }).select(
+    "+emailVerificationOtpHash +emailVerificationOtpExpiresAt +emailVerificationOtpLastSentAt"
+  );
+
+  if (!user) {
+    res.status(404);
+    throw new Error("No verification request was found for that email.");
+  }
+
+  if (user.isEmailVerified) {
+    const token = generateToken(user._id);
+    setAuthCookie(res, token);
+
+    res.status(200).json({
+      success: true,
+      message: "Email already verified.",
+      user: buildUserPayload(user),
+      token,
+    });
+    return;
+  }
+
+  if (isOtpExpired(user)) {
+    res.status(400);
+    throw new Error("This verification code has expired. Please request a new one.");
+  }
+
+  if (!isOtpValid(user, otp)) {
+    res.status(400);
+    throw new Error("The verification code you entered is incorrect.");
+  }
+
+  user.isEmailVerified = true;
+  user.emailVerifiedAt = new Date();
+  clearEmailVerificationOtp(user);
+  await user.save();
+
+  const token = generateToken(user._id);
+  setAuthCookie(res, token);
+
+  res.status(200).json({
+    success: true,
+    message: "Email verified successfully.",
+    user: buildUserPayload(user),
+    token,
+  });
+});
+
+const resendVerificationOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email: email.toLowerCase() }).select(
+    "+emailVerificationOtpHash +emailVerificationOtpExpiresAt +emailVerificationOtpLastSentAt"
+  );
+
+  if (!user) {
+    res.status(404);
+    throw new Error("No account was found for that email.");
+  }
+
+  if (user.isEmailVerified) {
+    res.status(400);
+    throw new Error("This email is already verified.");
+  }
+
+  const cooldownRemaining = getOtpResendCooldownRemaining(user);
+
+  if (cooldownRemaining > 0) {
+    res.status(429);
+    throw new Error(`Please wait ${cooldownRemaining} seconds before requesting a new code.`);
+  }
+
+  const otp = assignEmailVerificationOtp(user);
+  await user.save();
+
+  let emailSent = false;
+
+  try {
+    await sendVerificationOtpEmail({
+      to: user.email,
+      name: user.name,
+      otp,
+      expiryMinutes: OTP_EXPIRY_MINUTES,
+    });
+    emailSent = true;
+  } catch (error) {
+    console.error("Failed to resend verification OTP email:", error.message);
+  }
+
+  if (!emailSent) {
+    res.status(500);
+    throw new Error("We could not send a new verification code right now. Please try again later.");
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "A new verification code has been sent.",
+    email: user.email,
+    resendCooldownSeconds: OTP_RESEND_COOLDOWN_SECONDS,
   });
 });
 
@@ -172,6 +327,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
+  verifyEmail,
+  resendVerificationOtp,
   getCurrentUser,
   updateProfile,
   logoutUser,

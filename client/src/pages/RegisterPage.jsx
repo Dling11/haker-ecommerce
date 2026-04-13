@@ -6,7 +6,6 @@ import toast from "react-hot-toast";
 
 import StatusMessage from "../components/common/StatusMessage";
 import { registerUser } from "../features/auth/authSlice";
-import getPostLoginPath from "../utils/getPostLoginPath";
 
 function RegisterPage() {
   const dispatch = useDispatch();
@@ -36,8 +35,19 @@ function RegisterPage() {
     const result = await dispatch(registerUser(formData));
 
     if (registerUser.fulfilled.match(result)) {
+      if (result.payload.requiresEmailVerification) {
+        toast.success(
+          result.payload.emailSent
+            ? "Account created. Check your email for the verification code."
+            : "Account created. Please request a new verification code to continue."
+        );
+        navigate(`/verify-email?email=${encodeURIComponent(result.payload.email)}`, {
+          replace: true,
+        });
+        return;
+      }
+
       toast.success("Account created successfully.");
-      navigate(getPostLoginPath(result.payload.user), { replace: true });
     }
   };
 

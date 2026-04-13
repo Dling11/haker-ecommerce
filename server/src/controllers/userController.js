@@ -94,6 +94,8 @@ const createUser = asyncHandler(async (req, res) => {
     phone: phone || "",
     role: role || "customer",
     status: status || "active",
+    isEmailVerified: true,
+    emailVerifiedAt: new Date(),
     avatar: avatar || { url: "", publicId: "" },
     shippingAddress: shippingAddress || {},
   });
