@@ -1,11 +1,12 @@
-import { Eye, LoaderCircle, RotateCcw } from "lucide-react";
+import { Eye, LoaderCircle, RotateCcw, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
 
 import AppModal from "../components/common/AppModal";
+import ConfirmModal from "../components/common/ConfirmModal";
 import StatusMessage from "../components/common/StatusMessage";
-import { fetchMyOrders } from "../features/orders/orderSlice";
+import { cancelMyOrder, fetchMyOrders } from "../features/orders/orderSlice";
 import { addCartItem, openCartDrawer } from "../features/cart/cartSlice";
 import { formatCurrency } from "../utils/formatCurrency";
 
@@ -29,6 +30,8 @@ function OrdersPage() {
   const { isLoading: isCartLoading } = useSelector((state) => state.cart);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [pendingCancelOrder, setPendingCancelOrder] = useState(null);
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
 
   useEffect(() => {
     dispatch(fetchMyOrders());
@@ -38,6 +41,8 @@ function OrdersPage() {
     () => selectedOrder?.orderItems?.filter((item) => item.isAvailable) || [],
     [selectedOrder]
   );
+  const canCancelOrder = (order) =>
+    ["pending", "need_payment"].includes(order.orderStatus);
 
   const handleReorder = async (order) => {
     const availableItems = order.orderItems.filter((item) => item.isAvailable);
@@ -75,6 +80,27 @@ function OrdersPage() {
     }
 
     setIsReordering(false);
+  };
+
+  const handleCancelOrder = async () => {
+    if (!pendingCancelOrder) {
+      return;
+    }
+
+    setIsCancellingOrder(true);
+    const result = await dispatch(cancelMyOrder(pendingCancelOrder._id));
+
+    if (cancelMyOrder.fulfilled.match(result)) {
+      toast.success("Order cancelled successfully.");
+      setPendingCancelOrder(null);
+      if (selectedOrder?._id === result.payload._id) {
+        setSelectedOrder(result.payload);
+      }
+    } else {
+      toast.error(result.payload || "Failed to cancel order.");
+    }
+
+    setIsCancellingOrder(false);
   };
 
   return (
@@ -167,6 +193,16 @@ function OrdersPage() {
                   >
                     {isReordering ? <LoaderCircle size={16} className="animate-spin" /> : <RotateCcw size={16} />}
                     {isReordering ? "Adding..." : "Order Again"}
+                  </button>
+                ) : null}
+                {canCancelOrder(order) ? (
+                  <button
+                    type="button"
+                    onClick={() => setPendingCancelOrder(order)}
+                    className="inline-flex items-center gap-2 rounded-[10px] border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                  >
+                    <XCircle size={16} />
+                    Cancel order
                   </button>
                 ) : null}
               </div>
@@ -278,6 +314,16 @@ function OrdersPage() {
             </div>
 
             <div className="flex flex-wrap justify-end gap-3">
+              {canCancelOrder(selectedOrder) ? (
+                <button
+                  type="button"
+                  onClick={() => setPendingCancelOrder(selectedOrder)}
+                  className="inline-flex items-center gap-2 rounded-[10px] border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                >
+                  <XCircle size={16} />
+                  Cancel this order
+                </button>
+              ) : null}
               {reorderableItems.length > 0 ? (
                 <button
                   type="button"
@@ -300,6 +346,19 @@ function OrdersPage() {
           </div>
         ) : null}
       </AppModal>
+
+      <ConfirmModal
+        isOpen={Boolean(pendingCancelOrder)}
+        onClose={() => setPendingCancelOrder(null)}
+        onConfirm={handleCancelOrder}
+        title="Cancel this order?"
+        description={`This will cancel order #${
+          pendingCancelOrder?._id?.slice(-6).toUpperCase() || ""
+        } and restore the available stock.`}
+        confirmLabel="Cancel order"
+        loadingLabel="Cancelling..."
+        isLoading={isCancellingOrder}
+      />
     </section>
   );
 }

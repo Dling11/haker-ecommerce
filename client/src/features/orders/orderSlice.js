@@ -27,6 +27,18 @@ export const fetchMyOrders = createAsyncThunk(
   }
 );
 
+export const cancelMyOrder = createAsyncThunk(
+  "orders/cancelMyOrder",
+  async (orderId, thunkAPI) => {
+    try {
+      const { data } = await api.put(`/orders/${orderId}/cancel`);
+      return data.order;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
 const initialState = {
   items: [],
   latestOrder: null,
@@ -52,6 +64,15 @@ const orderSlice = createSlice({
       .addCase(fetchMyOrders.fulfilled, (state, action) => {
         state.isLoading = false;
         state.items = action.payload;
+      })
+      .addCase(cancelMyOrder.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.items = state.items.map((order) =>
+          order._id === action.payload._id ? action.payload : order
+        );
+        if (state.latestOrder?._id === action.payload._id) {
+          state.latestOrder = action.payload;
+        }
       })
       .addMatcher(
         (action) =>

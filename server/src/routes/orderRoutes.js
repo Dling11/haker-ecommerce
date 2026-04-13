@@ -2,6 +2,7 @@ const express = require("express");
 const { body, param } = require("express-validator");
 
 const {
+  cancelMyOrder,
   createAdminOrder,
   createOrder,
   deleteAdminOrder,
@@ -19,6 +20,14 @@ const router = express.Router();
 router.use(protect);
 
 router.get("/my-orders", getMyOrders);
+router.put(
+  "/:id/cancel",
+  [
+    param("id").isMongoId().withMessage("A valid order id is required."),
+  ],
+  validateRequest,
+  cancelMyOrder
+);
 router.get("/admin", adminOnly, getAllOrders);
 router.post(
   "/admin",

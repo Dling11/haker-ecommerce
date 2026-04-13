@@ -4,7 +4,57 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const { getSiteSettings } = require("../utils/siteSettings");
-const { sendOrderConfirmationEmail } = require("../services/emailService");
+const {
+  sendOrderConfirmationEmail,
+  sendOrderStatusEmail,
+} = require("../services/emailService");
+
+const userCancellableStatuses = ["pending", "need_payment"];
+
+const restoreOrderStock = async (order) => {
+  await Promise.all(
+    order.orderItems.map((item) =>
+      Product.findByIdAndUpdate(item.product, {
+        $inc: { stock: item.quantity },
+      })
+    )
+  );
+};
+
+const sendOrderStatusEmailIfEligible = async ({ order, user }) => {
+  if (!user?.isEmailVerified) {
+    return;
+  }
+
+  if (!["out_for_delivery", "delivered", "cancelled"].includes(order.orderStatus)) {
+    return;
+  }
+
+  try {
+    await sendOrderStatusEmail({
+      to: user.email,
+      user,
+      order,
+    });
+  } catch (error) {
+    console.error("Failed to send order status email:", error.message);
+  }
+};
+
+const resolveOrderEmailUser = async (userOrId) => {
+  if (!userOrId) {
+    return null;
+  }
+
+  if (typeof userOrId === "object" && userOrId.email && userOrId.isEmailVerified !== undefined) {
+    return userOrId;
+  }
+
+  const userId =
+    typeof userOrId === "object" && userOrId._id ? userOrId._id : userOrId;
+
+  return User.findById(userId).select("name email isEmailVerified");
+};
 
 const calculateTotals = (orderItems) => {
   const itemsPrice = Number(
@@ -15,6 +65,43 @@ const calculateTotals = (orderItems) => {
   const totalPrice = Number((itemsPrice + shippingPrice + taxPrice).toFixed(2));
 
   return { itemsPrice, shippingPrice, taxPrice, totalPrice };
+};
+
+const enrichOrdersWithAvailability = async (orders) => {
+  const normalizedOrders = Array.isArray(orders) ? orders : [orders];
+  const productIds = [
+    ...new Set(
+      normalizedOrders.flatMap((order) =>
+        order.orderItems.map((item) => item.product?.toString()).filter(Boolean)
+      )
+    ),
+  ];
+
+  const products = await Product.find({ _id: { $in: productIds } })
+    .select("_id stock isPublished")
+    .lean();
+  const productMap = new Map(products.map((product) => [product._id.toString(), product]));
+
+  return normalizedOrders.map((order) => {
+    const plainOrder = typeof order.toObject === "function" ? order.toObject() : order;
+    const orderItems = plainOrder.orderItems.map((item) => {
+      const currentProduct = productMap.get(item.product?.toString());
+      const availableQuantity =
+        currentProduct && currentProduct.isPublished ? currentProduct.stock : 0;
+
+      return {
+        ...item,
+        isAvailable: availableQuantity > 0,
+        availableQuantity,
+      };
+    });
+
+    return {
+      ...plainOrder,
+      orderItems,
+      canReorder: orderItems.some((item) => item.isAvailable),
+    };
+  });
 };
 
 const createOrder = asyncHandler(async (req, res) => {
@@ -186,36 +273,7 @@ const createAdminOrder = asyncHandler(async (req, res) => {
 
 const getMyOrders = asyncHandler(async (req, res) => {
   const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 }).lean();
-  const productIds = [
-    ...new Set(
-      orders.flatMap((order) => order.orderItems.map((item) => item.product?.toString()).filter(Boolean))
-    ),
-  ];
-
-  const products = await Product.find({ _id: { $in: productIds } })
-    .select("_id stock isPublished")
-    .lean();
-  const productMap = new Map(products.map((product) => [product._id.toString(), product]));
-
-  const normalizedOrders = orders.map((order) => {
-    const orderItems = order.orderItems.map((item) => {
-      const currentProduct = productMap.get(item.product?.toString());
-      const availableQuantity =
-        currentProduct && currentProduct.isPublished ? currentProduct.stock : 0;
-
-      return {
-        ...item,
-        isAvailable: availableQuantity > 0,
-        availableQuantity,
-      };
-    });
-
-    return {
-      ...order,
-      orderItems,
-      canReorder: orderItems.some((item) => item.isAvailable),
-    };
-  });
+  const normalizedOrders = await enrichOrdersWithAvailability(orders);
 
   res.status(200).json({
     success: true,
@@ -322,6 +380,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     throw new Error("Order not found.");
   }
 
+  const previousOrderStatus = order.orderStatus;
   order.orderStatus = req.body.orderStatus || order.orderStatus;
   order.paymentStatus = req.body.paymentStatus || order.paymentStatus;
 
@@ -329,7 +388,13 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     order.deliveredAt = new Date();
   }
 
+  if (previousOrderStatus !== "cancelled" && order.orderStatus === "cancelled") {
+    await restoreOrderStock(order);
+  }
+
   await order.save();
+  const user = await User.findById(order.user).select("-password");
+  await sendOrderStatusEmailIfEligible({ order, user });
 
   res.status(200).json({
     success: true,
@@ -354,6 +419,7 @@ const updateAdminOrder = asyncHandler(async (req, res) => {
     gcashReference,
     notes,
   } = req.body;
+  const previousOrderStatus = order.orderStatus;
 
   if (shippingAddress) {
     order.shippingAddress = {
@@ -381,6 +447,10 @@ const updateAdminOrder = asyncHandler(async (req, res) => {
     }
   }
 
+  if (previousOrderStatus !== "cancelled" && order.orderStatus === "cancelled") {
+    await restoreOrderStock(order);
+  }
+
   if (gcashReference !== undefined) {
     order.gcashReference = gcashReference;
   }
@@ -390,6 +460,8 @@ const updateAdminOrder = asyncHandler(async (req, res) => {
   }
 
   await order.save();
+  const emailUser = await resolveOrderEmailUser(order.user);
+  await sendOrderStatusEmailIfEligible({ order, user: emailUser });
 
   res.status(200).json({
     success: true,
@@ -406,11 +478,7 @@ const deleteAdminOrder = asyncHandler(async (req, res) => {
     throw new Error("Order not found.");
   }
 
-  for (const item of order.orderItems) {
-    await Product.findByIdAndUpdate(item.product, {
-      $inc: { stock: item.quantity },
-    });
-  }
+  await restoreOrderStock(order);
 
   await order.deleteOne();
 
@@ -420,7 +488,39 @@ const deleteAdminOrder = asyncHandler(async (req, res) => {
   });
 });
 
+const cancelMyOrder = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+
+  if (!order) {
+    res.status(404);
+    throw new Error("Order not found.");
+  }
+
+  if (order.user.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error("You are not allowed to cancel this order.");
+  }
+
+  if (!userCancellableStatuses.includes(order.orderStatus)) {
+    res.status(400);
+    throw new Error("This order can no longer be cancelled.");
+  }
+
+  order.orderStatus = "cancelled";
+  await restoreOrderStock(order);
+  await order.save();
+  await sendOrderStatusEmailIfEligible({ order, user: req.user });
+  const [normalizedOrder] = await enrichOrdersWithAvailability(order);
+
+  res.status(200).json({
+    success: true,
+    message: "Order cancelled successfully.",
+    order: normalizedOrder,
+  });
+});
+
 module.exports = {
+  cancelMyOrder,
   createAdminOrder,
   createOrder,
   deleteAdminOrder,

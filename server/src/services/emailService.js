@@ -4,7 +4,7 @@ const { formatCurrency } = require("../utils/formatCurrency");
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-const getFromEmail = () => process.env.RESEND_FROM_EMAIL || "";
+const getFromEmail = () => (process.env.RESEND_FROM_EMAIL || "").trim();
 
 const ensureEmailConfigured = () => {
   if (!resend || !getFromEmail()) {
@@ -79,6 +79,25 @@ const buildOrderConfirmationEmailHtml = ({ user, order }) => {
   `;
 };
 
+const buildOrderStatusEmailHtml = ({ user, order, heading, message }) => `
+  <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a;">
+    <h1 style="font-size: 24px; margin-bottom: 16px;">${heading}</h1>
+    <p style="font-size: 15px; line-height: 1.7; color: #334155;">
+      Hi ${user.name}, ${message}
+    </p>
+    <div style="margin: 24px 0; border-radius: 12px; background: #f8fafc; padding: 20px;">
+      <p style="margin: 0 0 8px; font-size: 14px; color: #475569;"><strong>Order ID:</strong> ${order._id}</p>
+      <p style="margin: 0 0 8px; font-size: 14px; color: #475569;"><strong>Status:</strong> ${order.orderStatus.replaceAll(
+        "_",
+        " "
+      )}</p>
+      <p style="margin: 0; font-size: 14px; color: #475569;"><strong>Total:</strong> ${formatCurrency(
+        order.totalPrice
+      )}</p>
+    </div>
+  </div>
+`;
+
 const sendVerificationOtpEmail = async ({ to, name, otp, expiryMinutes }) => {
   ensureEmailConfigured();
 
@@ -101,7 +120,48 @@ const sendOrderConfirmationEmail = async ({ to, user, order }) => {
   });
 };
 
+const sendOrderStatusEmail = async ({ to, user, order }) => {
+  ensureEmailConfigured();
+
+  const contentMap = {
+    out_for_delivery: {
+      subject: `Your order is out for delivery - ${order._id.toString().slice(-6).toUpperCase()}`,
+      heading: "Your order is on the way",
+      message: "your order is now out for delivery and should reach you soon.",
+    },
+    delivered: {
+      subject: `Order delivered - ${order._id.toString().slice(-6).toUpperCase()}`,
+      heading: "Order delivered",
+      message: "your order has been marked as delivered. We hope everything arrived safely.",
+    },
+    cancelled: {
+      subject: `Order cancelled - ${order._id.toString().slice(-6).toUpperCase()}`,
+      heading: "Order cancelled",
+      message: "your order has been cancelled. If this was unexpected, please contact support.",
+    },
+  };
+
+  const content = contentMap[order.orderStatus];
+
+  if (!content) {
+    return;
+  }
+
+  await resend.emails.send({
+    from: getFromEmail(),
+    to,
+    subject: content.subject,
+    html: buildOrderStatusEmailHtml({
+      user,
+      order,
+      heading: content.heading,
+      message: content.message,
+    }),
+  });
+};
+
 module.exports = {
   sendOrderConfirmationEmail,
+  sendOrderStatusEmail,
   sendVerificationOtpEmail,
 };

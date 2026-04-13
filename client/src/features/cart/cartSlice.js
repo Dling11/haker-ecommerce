@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
 import api from "../../services/api";
 import getErrorMessage from "../../utils/getErrorMessage";
+import { createOrder } from "../orders/orderSlice";
 
 export const fetchCart = createAsyncThunk("cart/fetchCart", async (_, thunkAPI) => {
   try {
@@ -89,6 +90,11 @@ const cartSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(createOrder.fulfilled, (state) => {
+        state.isLoading = false;
+        state.cart = { items: [], itemsPrice: 0 };
+        state.isDrawerOpen = false;
+      })
       .addMatcher(
         (action) =>
           action.type.startsWith("cart/") && action.type.endsWith("/pending"),

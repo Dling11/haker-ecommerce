@@ -1,5 +1,6 @@
 import { createColumnHelper } from "@tanstack/react-table";
 import {
+  EyeOff,
   Eye,
   ImagePlus,
   LoaderCircle,
@@ -62,6 +63,7 @@ function AdminUsersPage() {
   const [pendingRoleChange, setPendingRoleChange] = useState(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -96,6 +98,7 @@ function AdminUsersPage() {
 
   const resetForm = () => {
     setEditingUserId(null);
+    setShowPassword(false);
     setFormData(initialFormState);
   };
 
@@ -500,118 +503,178 @@ function AdminUsersPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <input
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Full name"
-              className="field"
-              required
-            />
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="Email address"
-              className="field"
-              required
-            />
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Full name</span>
+              <input
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Enter full name"
+                className="field"
+                required
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Email address</span>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter email address"
+                className="field"
+                required
+              />
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <input
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="Phone number"
-              className="field"
-            />
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder={editingUserId ? "Leave blank to keep password" : "Temporary password"}
-              className="field"
-              required={!editingUserId}
-            />
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Phone number</span>
+              <input
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Enter phone number"
+                className="field"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">
+                {editingUserId ? "Change password" : "Temporary password"}
+              </span>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder={
+                    editingUserId
+                      ? "Leave blank to keep current password"
+                      : "Enter temporary password"
+                  }
+                  className="field pr-12"
+                  required={!editingUserId}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white/55"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              <p className="text-xs leading-5 text-white/45">
+                {editingUserId
+                  ? "For security, current passwords cannot be viewed. Enter a new one only if you want to replace it."
+                  : "Set the password the user will use on first login."}
+              </p>
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <select name="role" value={formData.role} onChange={handleChange} className="field">
-              <option value="customer">Customer</option>
-              <option value="admin">Admin</option>
-            </select>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              className="field"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="banned">Banned</option>
-            </select>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Role</span>
+              <select name="role" value={formData.role} onChange={handleChange} className="field">
+                <option value="customer">Customer</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Status</span>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="field"
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="banned">Banned</option>
+              </select>
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <input
-              name="fullName"
-              value={formData.fullName}
-              onChange={handleChange}
-              placeholder="Receiver name"
-              className="field"
-            />
-            <input
-              name="shippingPhone"
-              value={formData.shippingPhone}
-              onChange={handleChange}
-              placeholder="Receiver phone"
-              className="field"
-            />
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Receiver name</span>
+              <input
+                name="fullName"
+                value={formData.fullName}
+                onChange={handleChange}
+                placeholder="Enter receiver name"
+                className="field"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Receiver phone</span>
+              <input
+                name="shippingPhone"
+                value={formData.shippingPhone}
+                onChange={handleChange}
+                placeholder="Enter receiver phone"
+                className="field"
+              />
+            </label>
           </div>
 
-          <input
-            name="street"
-            value={formData.street}
-            onChange={handleChange}
-            placeholder="Street address"
-            className="field"
-          />
+          <label className="space-y-2 block">
+            <span className="text-sm font-semibold text-white/75">Street address</span>
+            <input
+              name="street"
+              value={formData.street}
+              onChange={handleChange}
+              placeholder="Enter street address"
+              className="field"
+            />
+          </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <input
-              name="city"
-              value={formData.city}
-              onChange={handleChange}
-              placeholder="City"
-              className="field"
-            />
-            <input
-              name="state"
-              value={formData.state}
-              onChange={handleChange}
-              placeholder="State / Province"
-              className="field"
-            />
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">City</span>
+              <input
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                placeholder="Enter city"
+                className="field"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">State / Province</span>
+              <input
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                placeholder="Enter state or province"
+                className="field"
+              />
+            </label>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <input
-              name="postalCode"
-              value={formData.postalCode}
-              onChange={handleChange}
-              placeholder="Postal code"
-              className="field"
-            />
-            <input
-              name="country"
-              value={formData.country}
-              onChange={handleChange}
-              placeholder="Country"
-              className="field"
-            />
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Postal code</span>
+              <input
+                name="postalCode"
+                value={formData.postalCode}
+                onChange={handleChange}
+                placeholder="Enter postal code"
+                className="field"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-white/75">Country</span>
+              <input
+                name="country"
+                value={formData.country}
+                onChange={handleChange}
+                placeholder="Enter country"
+                className="field"
+              />
+            </label>
           </div>
 
           <div className="flex justify-end gap-3">
