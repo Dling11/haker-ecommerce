@@ -6,7 +6,7 @@ function StatusMessage({ type = "info", message }) {
   const toneMap = {
     info: "border-sky-500/20 bg-sky-500/10 text-sky-200",
     error: "border-rose-500/20 bg-rose-500/10 text-rose-200",
-    success: "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-800",
   };
 
   return (
