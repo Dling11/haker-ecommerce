@@ -22,6 +22,7 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const isCustomerLoginDisabled = settings?.allowCustomerLogin === false;
   const isMaintenanceMode = settings?.maintenanceMode === true;
+  const isEmailSystemDisabled = settings?.emailSystemEnabled === false;
 
   const redirectPath = location.state?.from?.pathname;
 
@@ -121,6 +122,17 @@ function LoginPage() {
         New here?{" "}
         <Link to="/register" className="font-semibold text-cyan-300">
           Create an account
+        </Link>
+      </p>
+      <p className="mt-3 text-sm text-white/65">
+        Forgot your password?{" "}
+        <Link
+          to="/reset-password"
+          className={`font-semibold ${
+            isEmailSystemDisabled ? "pointer-events-none text-white/35" : "text-cyan-300"
+          }`}
+        >
+          Reset it here
         </Link>
       </p>
     </section>

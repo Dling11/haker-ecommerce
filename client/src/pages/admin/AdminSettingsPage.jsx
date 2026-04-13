@@ -14,6 +14,7 @@ const defaultForm = {
   maintenanceMessage: "",
   allowCustomerRegistration: true,
   allowCustomerLogin: true,
+  emailSystemEnabled: true,
   allowCheckout: true,
   allowCashOnDelivery: true,
   allowGCash: true,
@@ -59,6 +60,7 @@ function AdminSettingsPage() {
         maintenanceMessage: siteSettings.maintenanceMessage,
         allowCustomerRegistration: siteSettings.allowCustomerRegistration,
         allowCustomerLogin: siteSettings.allowCustomerLogin,
+        emailSystemEnabled: siteSettings.emailSystemEnabled,
         allowCheckout: siteSettings.allowCheckout,
         allowCashOnDelivery: siteSettings.allowCashOnDelivery,
         allowGCash: siteSettings.allowGCash,
@@ -174,6 +176,12 @@ function AdminSettingsPage() {
                 description="Disable this to block new customer sign-ins. Admin login remains available."
                 checked={formData.allowCustomerLogin}
                 onChange={() => handleToggle("allowCustomerLogin")}
+              />
+              <ToggleCard
+                title="Enable email system"
+                description="Turn email verification, forgot-password emails, and order emails on or off for testing. When this is off, customer logins skip email verification."
+                checked={formData.emailSystemEnabled}
+                onChange={() => handleToggle("emailSystemEnabled")}
               />
             </div>
           </div>

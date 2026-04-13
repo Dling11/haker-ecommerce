@@ -4,8 +4,10 @@ const { body } = require("express-validator");
 const {
   registerUser,
   loginUser,
+  forgotPassword,
   verifyEmail,
   resendVerificationOtp,
+  resetPassword,
   getCurrentUser,
   updateProfile,
   logoutUser,
@@ -38,6 +40,12 @@ router.post(
   loginUser
 );
 router.post(
+  "/forgot-password",
+  [body("email").isEmail().withMessage("A valid email is required.")],
+  validateRequest,
+  forgotPassword
+);
+router.post(
   "/verify-email",
   [
     body("email").isEmail().withMessage("A valid email is required."),
@@ -54,6 +62,21 @@ router.post(
   [body("email").isEmail().withMessage("A valid email is required.")],
   validateRequest,
   resendVerificationOtp
+);
+router.post(
+  "/reset-password",
+  [
+    body("email").isEmail().withMessage("A valid email is required."),
+    body("otp")
+      .trim()
+      .matches(/^[A-Za-z0-9]{6,12}$/)
+      .withMessage("Reset code must be 6 to 12 letters or numbers."),
+    body("newPassword")
+      .isLength({ min: 6 })
+      .withMessage("New password must be at least 6 characters."),
+  ],
+  validateRequest,
+  resetPassword
 );
 
 router.post("/logout", logoutUser);

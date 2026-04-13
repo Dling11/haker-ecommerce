@@ -22,6 +22,12 @@ const restoreOrderStock = async (order) => {
 };
 
 const sendOrderStatusEmailIfEligible = async ({ order, user }) => {
+  const settings = await getSiteSettings();
+
+  if (!settings.emailSystemEnabled) {
+    return;
+  }
+
   if (!user?.isEmailVerified) {
     return;
   }
@@ -172,7 +178,7 @@ const createOrder = asyncHandler(async (req, res) => {
   cart.itemsPrice = 0;
   await cart.save();
 
-  if (req.user.isEmailVerified) {
+  if (settings.emailSystemEnabled && req.user.isEmailVerified) {
     try {
       await sendOrderConfirmationEmail({
         to: req.user.email,

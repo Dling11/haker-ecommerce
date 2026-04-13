@@ -17,6 +17,7 @@ const LoginPage = lazy(() => import("./pages/LoginPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage"));
 const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 const AdminOrdersPage = lazy(() => import("./pages/admin/AdminOrdersPage"));
@@ -43,6 +44,7 @@ function App() {
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Route>
       </Route>

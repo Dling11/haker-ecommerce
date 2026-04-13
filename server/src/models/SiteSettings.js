@@ -19,6 +19,10 @@ const siteSettingsSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    emailSystemEnabled: {
+      type: Boolean,
+      default: true,
+    },
     allowCheckout: {
       type: Boolean,
       default: true,

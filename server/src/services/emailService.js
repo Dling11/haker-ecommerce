@@ -5,6 +5,10 @@ const { formatCurrency } = require("../utils/formatCurrency");
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const getFromEmail = () => (process.env.RESEND_FROM_EMAIL || "").trim();
+const getFrontendBaseUrl = () =>
+  (process.env.FRONTEND_URL ||
+    process.env.CLIENT_URL?.split(",")[0] ||
+    "http://localhost:5173").trim();
 
 const ensureEmailConfigured = () => {
   if (!resend || !getFromEmail()) {
@@ -98,6 +102,37 @@ const buildOrderStatusEmailHtml = ({ user, order, heading, message }) => `
   </div>
 `;
 
+const buildPasswordResetEmailHtml = ({ name, otp, resetUrl, expiryMinutes }) => `
+  <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #0f172a;">
+    <h1 style="font-size: 24px; margin-bottom: 16px;">Reset your password</h1>
+    <p style="font-size: 15px; line-height: 1.7; color: #334155;">
+      Hi ${name || "there"}, we received a request to reset your haker-ecommerce password.
+    </p>
+    <div style="margin: 24px 0; border-radius: 12px; background: #eff6ff; padding: 20px; text-align: center;">
+      <p style="margin: 0 0 8px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: #2563eb;">
+        Reset Code
+      </p>
+      <p style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 0.2em; color: #1d4ed8;">
+        ${otp}
+      </p>
+    </div>
+    <p style="font-size: 14px; line-height: 1.7; color: #475569;">
+      This code expires in ${expiryMinutes} minutes. Use it on the reset page below and choose a new password immediately.
+    </p>
+    <p style="margin-top: 24px;">
+      <a
+        href="${resetUrl}"
+        style="display: inline-block; border-radius: 10px; background: #111827; color: #ffffff; padding: 12px 18px; text-decoration: none; font-weight: 600;"
+      >
+        Open Reset Page
+      </a>
+    </p>
+    <p style="font-size: 13px; line-height: 1.7; color: #64748b; margin-top: 16px;">
+      If you did not request a password reset, you can safely ignore this email.
+    </p>
+  </div>
+`;
+
 const sendVerificationOtpEmail = async ({ to, name, otp, expiryMinutes }) => {
   ensureEmailConfigured();
 
@@ -160,8 +195,29 @@ const sendOrderStatusEmail = async ({ to, user, order }) => {
   });
 };
 
+const sendPasswordResetEmail = async ({ to, name, otp, expiryMinutes }) => {
+  ensureEmailConfigured();
+
+  const resetUrl = `${getFrontendBaseUrl().replace(/\/$/, "")}/reset-password?email=${encodeURIComponent(
+    to
+  )}`;
+
+  await resend.emails.send({
+    from: getFromEmail(),
+    to,
+    subject: "Reset your haker-ecommerce password",
+    html: buildPasswordResetEmailHtml({
+      name,
+      otp,
+      resetUrl,
+      expiryMinutes,
+    }),
+  });
+};
+
 module.exports = {
   sendOrderConfirmationEmail,
   sendOrderStatusEmail,
+  sendPasswordResetEmail,
   sendVerificationOtpEmail,
 };
