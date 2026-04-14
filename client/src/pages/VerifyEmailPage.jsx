@@ -1,4 +1,4 @@
-import { LoaderCircle, RotateCw } from "lucide-react";
+import { Info, LoaderCircle, RotateCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -88,6 +88,19 @@ function VerifyEmailPage() {
         <p className="text-sm leading-6 text-white/65">
           Enter the 6-digit code sent during registration to activate your account.
         </p>
+      </div>
+
+      <div className="mt-6 rounded-[10px] border border-amber-400/25 bg-amber-400/10 px-4 py-4 text-sm text-amber-100">
+        <div className="flex items-start gap-3">
+          <Info size={18} className="mt-0.5 shrink-0 text-amber-200" />
+          <div className="space-y-1">
+            <p className="font-semibold text-amber-100">Didn&apos;t get the email?</p>
+            <p className="leading-6 text-amber-100/85">
+              Please check your spam or junk folder first. Some verification emails,
+              especially OTP messages, can land there depending on your email provider.
+            </p>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">

@@ -36,6 +36,10 @@ router.put(
       .optional()
       .isBoolean()
       .withMessage("Email system toggle must be true or false."),
+    body("emailProvider")
+      .optional()
+      .isIn(["gmail", "resend"])
+      .withMessage("Email provider must be either gmail or resend."),
     body("smsSystemEnabled")
       .optional()
       .isBoolean()

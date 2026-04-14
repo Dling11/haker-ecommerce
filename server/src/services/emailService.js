@@ -1,19 +1,79 @@
+const nodemailer = require("nodemailer");
 const { Resend } = require("resend");
 
 const { formatCurrency } = require("../utils/formatCurrency");
+const { getSiteSettings } = require("../utils/siteSettings");
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const getFromEmail = () => (process.env.RESEND_FROM_EMAIL || "").trim();
+const getGmailUser = () => (process.env.GMAIL_USER || "").trim();
+const getGmailAppPassword = () => (process.env.GMAIL_APP_PASSWORD || "").trim();
 const getFrontendBaseUrl = () =>
   (process.env.FRONTEND_URL ||
     process.env.CLIENT_URL?.split(",")[0] ||
     "http://localhost:5173").trim();
 
-const ensureEmailConfigured = () => {
-  if (!resend || !getFromEmail()) {
-    throw new Error("Email service is not configured.");
+let gmailTransporter = null;
+
+const isGmailConfigured = () => Boolean(getGmailUser() && getGmailAppPassword());
+const isResendConfigured = () => Boolean(resend && getFromEmail());
+
+const getConfiguredEmailProvider = async () => {
+  const settings = await getSiteSettings();
+
+  if (settings.emailProvider === "gmail" && isGmailConfigured()) {
+    return "gmail";
   }
+
+  if (settings.emailProvider === "resend" && isResendConfigured()) {
+    return "resend";
+  }
+
+  if (settings.emailProvider === "gmail" && !isGmailConfigured()) {
+    throw new Error("Gmail email provider is selected but not configured.");
+  }
+
+  if (settings.emailProvider === "resend" && !isResendConfigured()) {
+    throw new Error("Resend email provider is selected but not configured.");
+  }
+
+  throw new Error("Email service is not configured.");
+};
+
+const getGmailTransporter = () => {
+  if (!gmailTransporter) {
+    gmailTransporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: getGmailUser(),
+        pass: getGmailAppPassword(),
+      },
+    });
+  }
+
+  return gmailTransporter;
+};
+
+const sendEmail = async ({ to, subject, html }) => {
+  const provider = await getConfiguredEmailProvider();
+
+  if (provider === "gmail") {
+    await getGmailTransporter().sendMail({
+      from: `"haker-ecommerce" <${getGmailUser()}>`,
+      to,
+      subject,
+      html,
+    });
+    return;
+  }
+
+  await resend.emails.send({
+    from: getFromEmail(),
+    to,
+    subject,
+    html,
+  });
 };
 
 const buildVerificationEmailHtml = ({ name, otp, expiryMinutes }) => `
@@ -134,10 +194,7 @@ const buildPasswordResetEmailHtml = ({ name, otp, resetUrl, expiryMinutes }) => 
 `;
 
 const sendVerificationOtpEmail = async ({ to, name, otp, expiryMinutes }) => {
-  ensureEmailConfigured();
-
-  await resend.emails.send({
-    from: getFromEmail(),
+  await sendEmail({
     to,
     subject: "Verify your haker-ecommerce account",
     html: buildVerificationEmailHtml({ name, otp, expiryMinutes }),
@@ -145,10 +202,7 @@ const sendVerificationOtpEmail = async ({ to, name, otp, expiryMinutes }) => {
 };
 
 const sendOrderConfirmationEmail = async ({ to, user, order }) => {
-  ensureEmailConfigured();
-
-  await resend.emails.send({
-    from: getFromEmail(),
+  await sendEmail({
     to,
     subject: `Order confirmation - ${order._id.toString().slice(-6).toUpperCase()}`,
     html: buildOrderConfirmationEmailHtml({ user, order }),
@@ -156,8 +210,6 @@ const sendOrderConfirmationEmail = async ({ to, user, order }) => {
 };
 
 const sendOrderStatusEmail = async ({ to, user, order }) => {
-  ensureEmailConfigured();
-
   const contentMap = {
     out_for_delivery: {
       subject: `Your order is out for delivery - ${order._id.toString().slice(-6).toUpperCase()}`,
@@ -182,8 +234,7 @@ const sendOrderStatusEmail = async ({ to, user, order }) => {
     return;
   }
 
-  await resend.emails.send({
-    from: getFromEmail(),
+  await sendEmail({
     to,
     subject: content.subject,
     html: buildOrderStatusEmailHtml({
@@ -196,14 +247,11 @@ const sendOrderStatusEmail = async ({ to, user, order }) => {
 };
 
 const sendPasswordResetEmail = async ({ to, name, otp, expiryMinutes }) => {
-  ensureEmailConfigured();
-
   const resetUrl = `${getFrontendBaseUrl().replace(/\/$/, "")}/reset-password?email=${encodeURIComponent(
     to
   )}`;
 
-  await resend.emails.send({
-    from: getFromEmail(),
+  await sendEmail({
     to,
     subject: "Reset your haker-ecommerce password",
     html: buildPasswordResetEmailHtml({
@@ -216,6 +264,7 @@ const sendPasswordResetEmail = async ({ to, name, otp, expiryMinutes }) => {
 };
 
 module.exports = {
+  getConfiguredEmailProvider,
   sendOrderConfirmationEmail,
   sendOrderStatusEmail,
   sendPasswordResetEmail,

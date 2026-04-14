@@ -39,7 +39,11 @@ function LoginPage() {
 
     if (loginUser.fulfilled.match(result)) {
       toast.success("Welcome back.");
-      navigate(redirectPath || getPostLoginPath(result.payload.user), { replace: true });
+      const postLoginPath =
+        result.payload.user?.role === "admin"
+          ? "/admin"
+          : redirectPath || getPostLoginPath(result.payload.user);
+      navigate(postLoginPath, { replace: true });
     }
   };
 

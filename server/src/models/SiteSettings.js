@@ -23,6 +23,11 @@ const siteSettingsSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    emailProvider: {
+      type: String,
+      enum: ["gmail", "resend"],
+      default: "resend",
+    },
     smsSystemEnabled: {
       type: Boolean,
       default: false,

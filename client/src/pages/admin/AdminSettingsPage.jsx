@@ -15,6 +15,7 @@ const defaultForm = {
   allowCustomerRegistration: true,
   allowCustomerLogin: true,
   emailSystemEnabled: true,
+  emailProvider: "resend",
   smsSystemEnabled: false,
   allowCheckout: true,
   allowCashOnDelivery: true,
@@ -62,6 +63,7 @@ function AdminSettingsPage() {
         allowCustomerRegistration: siteSettings.allowCustomerRegistration,
         allowCustomerLogin: siteSettings.allowCustomerLogin,
         emailSystemEnabled: siteSettings.emailSystemEnabled,
+        emailProvider: siteSettings.emailProvider || "resend",
         smsSystemEnabled: siteSettings.smsSystemEnabled ?? false,
         allowCheckout: siteSettings.allowCheckout,
         allowCashOnDelivery: siteSettings.allowCashOnDelivery,
@@ -185,6 +187,26 @@ function AdminSettingsPage() {
                 checked={formData.emailSystemEnabled}
                 onChange={() => handleToggle("emailSystemEnabled")}
               />
+              <label className="block space-y-2">
+                <span className="text-sm font-semibold text-white/75">Email provider</span>
+                <select
+                  value={formData.emailProvider}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      emailProvider: event.target.value,
+                    }))
+                  }
+                  className="field"
+                  disabled={!formData.emailSystemEnabled}
+                >
+                  <option value="resend">Resend</option>
+                  <option value="gmail">Gmail (Nodemailer)</option>
+                </select>
+                <p className="text-xs leading-5 text-white/45">
+                  Choose which service handles OTP, password reset, and order emails.
+                </p>
+              </label>
               <ToggleCard
                 title="Enable SMS system"
                 description="Turn ClickSend order-status texts on or off for testing. SMS currently covers out-for-delivery, delivered, and cancelled updates."
