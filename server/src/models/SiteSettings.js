@@ -23,6 +23,10 @@ const siteSettingsSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    smsSystemEnabled: {
+      type: Boolean,
+      default: false,
+    },
     allowCheckout: {
       type: Boolean,
       default: true,

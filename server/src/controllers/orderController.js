@@ -8,6 +8,7 @@ const {
   sendOrderConfirmationEmail,
   sendOrderStatusEmail,
 } = require("../services/emailService");
+const { sendOrderStatusSms } = require("../services/smsService");
 
 const userCancellableStatuses = ["pending", "need_payment"];
 
@@ -44,6 +45,34 @@ const sendOrderStatusEmailIfEligible = async ({ order, user }) => {
     });
   } catch (error) {
     console.error("Failed to send order status email:", error.message);
+  }
+};
+
+const sendOrderStatusSmsIfEligible = async ({ order, user }) => {
+  const settings = await getSiteSettings();
+
+  if (!settings.smsSystemEnabled) {
+    return;
+  }
+
+  if (!["out_for_delivery", "delivered", "cancelled"].includes(order.orderStatus)) {
+    return;
+  }
+
+  const phone = order.shippingAddress?.phone || user?.phone || "";
+
+  if (!phone) {
+    return;
+  }
+
+  try {
+    await sendOrderStatusSms({
+      order,
+      user,
+      phone,
+    });
+  } catch (error) {
+    console.error("Failed to send order status SMS:", error.message);
   }
 };
 
@@ -401,6 +430,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   await order.save();
   const user = await User.findById(order.user).select("-password");
   await sendOrderStatusEmailIfEligible({ order, user });
+  await sendOrderStatusSmsIfEligible({ order, user });
 
   res.status(200).json({
     success: true,
@@ -468,6 +498,7 @@ const updateAdminOrder = asyncHandler(async (req, res) => {
   await order.save();
   const emailUser = await resolveOrderEmailUser(order.user);
   await sendOrderStatusEmailIfEligible({ order, user: emailUser });
+  await sendOrderStatusSmsIfEligible({ order, user: emailUser });
 
   res.status(200).json({
     success: true,
@@ -516,6 +547,7 @@ const cancelMyOrder = asyncHandler(async (req, res) => {
   await restoreOrderStock(order);
   await order.save();
   await sendOrderStatusEmailIfEligible({ order, user: req.user });
+  await sendOrderStatusSmsIfEligible({ order, user: req.user });
   const [normalizedOrder] = await enrichOrdersWithAvailability(order);
 
   res.status(200).json({

@@ -15,6 +15,7 @@ const defaultForm = {
   allowCustomerRegistration: true,
   allowCustomerLogin: true,
   emailSystemEnabled: true,
+  smsSystemEnabled: false,
   allowCheckout: true,
   allowCashOnDelivery: true,
   allowGCash: true,
@@ -61,6 +62,7 @@ function AdminSettingsPage() {
         allowCustomerRegistration: siteSettings.allowCustomerRegistration,
         allowCustomerLogin: siteSettings.allowCustomerLogin,
         emailSystemEnabled: siteSettings.emailSystemEnabled,
+        smsSystemEnabled: siteSettings.smsSystemEnabled ?? false,
         allowCheckout: siteSettings.allowCheckout,
         allowCashOnDelivery: siteSettings.allowCashOnDelivery,
         allowGCash: siteSettings.allowGCash,
@@ -182,6 +184,12 @@ function AdminSettingsPage() {
                 description="Turn email verification, forgot-password emails, and order emails on or off for testing. When this is off, customer logins skip email verification."
                 checked={formData.emailSystemEnabled}
                 onChange={() => handleToggle("emailSystemEnabled")}
+              />
+              <ToggleCard
+                title="Enable SMS system"
+                description="Turn ClickSend order-status texts on or off for testing. SMS currently covers out-for-delivery, delivered, and cancelled updates."
+                checked={formData.smsSystemEnabled}
+                onChange={() => handleToggle("smsSystemEnabled")}
               />
             </div>
           </div>

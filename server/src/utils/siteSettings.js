@@ -6,6 +6,7 @@ const defaultSettings = {
   allowCustomerRegistration: true,
   allowCustomerLogin: true,
   emailSystemEnabled: true,
+  smsSystemEnabled: false,
   allowCheckout: true,
   allowCashOnDelivery: true,
   allowGCash: true,
@@ -17,6 +18,20 @@ const getSiteSettings = async () => {
 
   if (!settings) {
     settings = await SiteSettings.create(defaultSettings);
+    return settings;
+  }
+
+  let shouldSave = false;
+
+  Object.entries(defaultSettings).forEach(([key, value]) => {
+    if (typeof settings[key] === "undefined") {
+      settings[key] = value;
+      shouldSave = true;
+    }
+  });
+
+  if (shouldSave) {
+    await settings.save();
   }
 
   return settings;
@@ -28,6 +43,7 @@ const buildPublicSiteSettings = (settings) => ({
   allowCustomerRegistration: settings.allowCustomerRegistration,
   allowCustomerLogin: settings.allowCustomerLogin,
   emailSystemEnabled: settings.emailSystemEnabled,
+  smsSystemEnabled: settings.smsSystemEnabled,
   allowCheckout: settings.allowCheckout,
   allowCashOnDelivery: settings.allowCashOnDelivery,
   allowGCash: settings.allowGCash,

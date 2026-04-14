@@ -32,6 +32,14 @@ router.put(
       .optional()
       .isBoolean()
       .withMessage("Customer login toggle must be true or false."),
+    body("emailSystemEnabled")
+      .optional()
+      .isBoolean()
+      .withMessage("Email system toggle must be true or false."),
+    body("smsSystemEnabled")
+      .optional()
+      .isBoolean()
+      .withMessage("SMS system toggle must be true or false."),
     body("allowCheckout").optional().isBoolean().withMessage("Checkout toggle must be true or false."),
     body("allowCashOnDelivery")
       .optional()
