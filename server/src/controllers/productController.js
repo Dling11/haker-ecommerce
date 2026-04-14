@@ -11,6 +11,13 @@ const buildSlug = (value) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+const recalculateProductRatings = (product) => {
+  product.numReviews = product.reviews.length;
+  product.rating = product.reviews.length
+    ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.reviews.length
+    : 0;
+};
+
 const getProducts = asyncHandler(async (req, res) => {
   const {
     keyword = "",
@@ -125,16 +132,73 @@ const addProductReview = asyncHandler(async (req, res) => {
     comment,
   });
 
-  product.numReviews = product.reviews.length;
-  product.rating =
-    product.reviews.reduce((sum, review) => sum + review.rating, 0) /
-    product.reviews.length;
+  recalculateProductRatings(product);
 
   await product.save();
 
   res.status(201).json({
     success: true,
     message: "Review submitted successfully.",
+    product,
+  });
+});
+
+const updateAdminProductReview = asyncHandler(async (req, res) => {
+  const { rating, comment } = req.body;
+  const product = await Product.findById(req.params.id);
+
+  if (!product) {
+    res.status(404);
+    throw new Error("Product not found.");
+  }
+
+  const review = product.reviews.id(req.params.reviewId);
+
+  if (!review) {
+    res.status(404);
+    throw new Error("Review not found.");
+  }
+
+  if (rating !== undefined) {
+    review.rating = Number(rating);
+  }
+
+  if (comment !== undefined) {
+    review.comment = comment;
+  }
+
+  recalculateProductRatings(product);
+  await product.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Review updated successfully.",
+    product,
+  });
+});
+
+const deleteAdminProductReview = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id);
+
+  if (!product) {
+    res.status(404);
+    throw new Error("Product not found.");
+  }
+
+  const review = product.reviews.id(req.params.reviewId);
+
+  if (!review) {
+    res.status(404);
+    throw new Error("Review not found.");
+  }
+
+  review.deleteOne();
+  recalculateProductRatings(product);
+  await product.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Review deleted successfully.",
     product,
   });
 });
@@ -269,4 +333,6 @@ module.exports = {
   deleteProduct,
   getAdminProducts,
   addProductReview,
+  updateAdminProductReview,
+  deleteAdminProductReview,
 };

@@ -4,7 +4,7 @@ const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 
 const getDashboardStats = asyncHandler(async (req, res) => {
-  const [usersCount, ordersCount, productsCount, revenueResult, latestOrders] =
+  const [usersCount, ordersCount, productsCount, revenueResult, latestOrders, reviewStats] =
     await Promise.all([
       User.countDocuments(),
       Order.countDocuments(),
@@ -26,6 +26,21 @@ const getDashboardStats = asyncHandler(async (req, res) => {
         .populate("user", "name email")
         .sort({ createdAt: -1 })
         .limit(5),
+      Product.aggregate([
+        {
+          $project: {
+            numReviews: 1,
+            rating: 1,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalReviews: { $sum: "$numReviews" },
+            averageStoreRating: { $avg: "$rating" },
+          },
+        },
+      ]),
     ]);
 
   const statusBreakdownRaw = await Order.aggregate([
@@ -48,6 +63,8 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       usersCount,
       ordersCount,
       productsCount,
+      totalReviews: reviewStats[0]?.totalReviews || 0,
+      averageStoreRating: reviewStats[0]?.averageStoreRating || 0,
       totalRevenue: revenueResult[0]?.totalRevenue || 0,
       statusBreakdown,
       latestOrders,

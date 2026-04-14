@@ -1,10 +1,9 @@
-import { Eye, Minus, Plus, ShoppingCart, Star } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Star } from "lucide-react";
 import { useEffect, useState } from "react";
-import InnerImageZoomModule from "react-inner-image-zoom";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import "react-inner-image-zoom/lib/styles.min.css";
+import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 
 import AppModal from "../common/AppModal";
 import { addCartItem, openCartDrawer } from "../../features/cart/cartSlice";
@@ -13,11 +12,6 @@ import {
   fetchProductDetails,
 } from "../../features/products/productSlice";
 import { formatCurrency } from "../../utils/formatCurrency";
-
-const InnerImageZoom =
-  InnerImageZoomModule?.default ||
-  InnerImageZoomModule?.InnerImageZoom ||
-  InnerImageZoomModule;
 
 const ReviewStars = ({ rating, interactive = false, onChange = null, size = 16 }) => (
   <div className="flex items-center gap-1">
@@ -142,19 +136,51 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
         <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
           <div className="lg:self-center">
             <div className="overflow-hidden rounded-[10px] border border-violet-100 bg-[linear-gradient(180deg,#faf7ff_0%,#f8fbff_100%)] p-6">
-              <div className="flex min-h-[320px] w-full items-center justify-center">
-                <InnerImageZoom
-                  src={activeProduct.images?.[0]?.url}
-                  zoomSrc={activeProduct.images?.[0]?.url}
-                  alt={activeProduct.name}
-                  zoomType="hover"
-                  hideHint
-                  hasSpacer={false}
-                  imgAttributes={{
-                    className: "mx-auto max-h-[360px] w-full object-contain",
-                  }}
-                />
-              </div>
+              <TransformWrapper
+                initialScale={1}
+                minScale={1}
+                maxScale={2.5}
+                centerOnInit
+                wheel={{ step: 0.12 }}
+                pinch={{ step: 5 }}
+                doubleClick={{ disabled: true }}
+              >
+                {({ zoomIn, zoomOut }) => (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => zoomOut()}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                        aria-label="Zoom out"
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => zoomIn()}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                        aria-label="Zoom in"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+
+                    <div className="flex min-h-[320px] w-full items-center justify-center">
+                      <TransformComponent
+                        wrapperClass="!h-full !w-full"
+                        contentClass="!h-full !w-full flex items-center justify-center"
+                      >
+                        <img
+                          src={activeProduct.images?.[0]?.url}
+                          alt={activeProduct.name}
+                          className="mx-auto max-h-[360px] w-full object-contain"
+                        />
+                      </TransformComponent>
+                    </div>
+                  </div>
+                )}
+              </TransformWrapper>
             </div>
           </div>
 

@@ -51,6 +51,33 @@ export const createProductReview = createAsyncThunk(
   }
 );
 
+export const updateAdminProductReview = createAsyncThunk(
+  "products/updateAdminProductReview",
+  async ({ productId, reviewId, rating, comment }, thunkAPI) => {
+    try {
+      const { data } = await api.put(`/products/${productId}/reviews/${reviewId}`, {
+        rating,
+        comment,
+      });
+      return data.product;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const deleteAdminProductReview = createAsyncThunk(
+  "products/deleteAdminProductReview",
+  async ({ productId, reviewId }, thunkAPI) => {
+    try {
+      const { data } = await api.delete(`/products/${productId}/reviews/${reviewId}`);
+      return data.product;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
 export const createProduct = createAsyncThunk(
   "products/createProduct",
   async (productData, thunkAPI) => {
@@ -178,6 +205,42 @@ const productSlice = createSlice({
       .addCase(createProductReview.rejected, (state, action) => {
         state.reviewLoading = false;
         state.error = action.payload;
+      })
+      .addCase(updateAdminProductReview.pending, (state) => {
+        state.reviewLoading = true;
+        state.adminError = null;
+      })
+      .addCase(updateAdminProductReview.fulfilled, (state, action) => {
+        state.reviewLoading = false;
+        state.selectedProduct = action.payload;
+        state.adminItems = state.adminItems.map((product) =>
+          product._id === action.payload._id ? action.payload : product
+        );
+        state.items = state.items.map((product) =>
+          product._id === action.payload._id ? action.payload : product
+        );
+      })
+      .addCase(updateAdminProductReview.rejected, (state, action) => {
+        state.reviewLoading = false;
+        state.adminError = action.payload;
+      })
+      .addCase(deleteAdminProductReview.pending, (state) => {
+        state.reviewLoading = true;
+        state.adminError = null;
+      })
+      .addCase(deleteAdminProductReview.fulfilled, (state, action) => {
+        state.reviewLoading = false;
+        state.selectedProduct = action.payload;
+        state.adminItems = state.adminItems.map((product) =>
+          product._id === action.payload._id ? action.payload : product
+        );
+        state.items = state.items.map((product) =>
+          product._id === action.payload._id ? action.payload : product
+        );
+      })
+      .addCase(deleteAdminProductReview.rejected, (state, action) => {
+        state.reviewLoading = false;
+        state.adminError = action.payload;
       });
   },
 });

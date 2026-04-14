@@ -9,6 +9,8 @@ const {
   deleteProduct,
   getAdminProducts,
   addProductReview,
+  updateAdminProductReview,
+  deleteAdminProductReview,
 } = require("../controllers/productController");
 const { protect, adminOnly } = require("../middleware/authMiddleware");
 const validateRequest = require("../middleware/validateRequest");
@@ -33,6 +35,37 @@ router.post(
   ],
   validateRequest,
   addProductReview
+);
+router.put(
+  "/:id/reviews/:reviewId",
+  protect,
+  adminOnly,
+  [
+    param("id").isMongoId().withMessage("A valid product id is required."),
+    param("reviewId").isMongoId().withMessage("A valid review id is required."),
+    body("rating")
+      .optional()
+      .isInt({ min: 1, max: 5 })
+      .withMessage("Rating must be between 1 and 5."),
+    body("comment")
+      .optional()
+      .trim()
+      .notEmpty()
+      .withMessage("Comment is required when updating a review."),
+  ],
+  validateRequest,
+  updateAdminProductReview
+);
+router.delete(
+  "/:id/reviews/:reviewId",
+  protect,
+  adminOnly,
+  [
+    param("id").isMongoId().withMessage("A valid product id is required."),
+    param("reviewId").isMongoId().withMessage("A valid review id is required."),
+  ],
+  validateRequest,
+  deleteAdminProductReview
 );
 
 router.post(

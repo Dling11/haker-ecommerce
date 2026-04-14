@@ -1,5 +1,5 @@
 import { createColumnHelper } from "@tanstack/react-table";
-import { LoaderCircle, PencilLine, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { LoaderCircle, MessageSquareMore, PencilLine, Plus, Search, SlidersHorizontal, Star, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
@@ -17,8 +17,11 @@ import {
 import { fetchCategories } from "../../features/categories/categorySlice";
 import {
   createProduct,
+  deleteAdminProductReview,
   deleteProduct,
   fetchAdminProducts,
+  fetchProductDetails,
+  updateAdminProductReview,
   updateProduct,
 } from "../../features/products/productSlice";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
@@ -43,6 +46,7 @@ const columnHelper = createColumnHelper();
 function AdminProductsPage() {
   const dispatch = useDispatch();
   const { adminItems, adminLoading, adminError, adminPagination } = useSelector((state) => state.products);
+  const { selectedProduct, reviewLoading } = useSelector((state) => state.products);
   const { items: categories } = useSelector((state) => state.categories);
   const { uploadLoading, uploadedImage, error } = useSelector((state) => state.admin);
 
@@ -53,6 +57,10 @@ function AdminProductsPage() {
   const [isDeletingProduct, setIsDeletingProduct] = useState(false);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [isRemovingImage, setIsRemovingImage] = useState(false);
+  const [reviewProduct, setReviewProduct] = useState(null);
+  const [editingReview, setEditingReview] = useState(null);
+  const [reviewDraft, setReviewDraft] = useState({ rating: 5, comment: "" });
+  const [reviewToDelete, setReviewToDelete] = useState(null);
   const [originalImage, setOriginalImage] = useState({ url: "", publicId: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -200,6 +208,18 @@ function AdminProductsPage() {
             <button
               type="button"
               className="btn-secondary px-4 py-2"
+              onClick={async () => {
+                setReviewProduct(row.original);
+                setEditingReview(null);
+                setReviewDraft({ rating: 5, comment: "" });
+                await dispatch(fetchProductDetails(row.original._id));
+              }}
+            >
+              <MessageSquareMore size={16} />
+            </button>
+            <button
+              type="button"
+              className="btn-secondary px-4 py-2"
               onClick={() => startEditing(row.original)}
             >
               <PencilLine size={16} />
@@ -215,7 +235,7 @@ function AdminProductsPage() {
         ),
       }),
     ],
-    []
+    [dispatch]
   );
 
   const handleChange = (event) => {
@@ -341,6 +361,51 @@ function AdminProductsPage() {
     }
 
     setIsDeletingProduct(false);
+  };
+
+  const activeReviewProduct =
+    selectedProduct?._id === reviewProduct?._id ? selectedProduct : reviewProduct;
+
+  const startEditingReview = (review) => {
+    setEditingReview(review._id);
+    setReviewDraft({
+      rating: review.rating,
+      comment: review.comment,
+    });
+  };
+
+  const handleReviewSave = async (reviewId) => {
+    const result = await dispatch(
+      updateAdminProductReview({
+        productId: activeReviewProduct._id,
+        reviewId,
+        rating: Number(reviewDraft.rating),
+        comment: reviewDraft.comment,
+      })
+    );
+
+    if (updateAdminProductReview.fulfilled.match(result)) {
+      toast.success("Review updated.");
+      setEditingReview(null);
+    } else {
+      toast.error(result.payload || "Failed to update review.");
+    }
+  };
+
+  const handleReviewDelete = async () => {
+    const result = await dispatch(
+      deleteAdminProductReview({
+        productId: activeReviewProduct._id,
+        reviewId: reviewToDelete._id,
+      })
+    );
+
+    if (deleteAdminProductReview.fulfilled.match(result)) {
+      toast.success("Review deleted.");
+      setReviewToDelete(null);
+    } else {
+      toast.error(result.payload || "Failed to delete review.");
+    }
   };
 
   return (
@@ -537,6 +602,166 @@ function AdminProductsPage() {
         confirmLabel="Delete product"
         loadingLabel="Deleting..."
         isLoading={isDeletingProduct}
+      />
+
+      <AppModal
+        isOpen={Boolean(reviewProduct)}
+        onClose={() => {
+          setReviewProduct(null);
+          setEditingReview(null);
+          setReviewToDelete(null);
+        }}
+        title={activeReviewProduct ? `${activeReviewProduct.name} reviews` : "Product reviews"}
+        description="Moderate product feedback, adjust ratings when needed, and remove inappropriate comments."
+        width="max-w-4xl"
+      >
+        {activeReviewProduct ? (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="panel-muted p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/40">Average rating</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <Star size={16} className="fill-current text-amber-300" />
+                  <p className="text-lg font-bold text-white">
+                    {(activeReviewProduct.rating || 0).toFixed(1)}
+                  </p>
+                </div>
+              </div>
+              <div className="panel-muted p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/40">Total reviews</p>
+                <p className="mt-2 text-lg font-bold text-white">
+                  {activeReviewProduct.numReviews || 0}
+                </p>
+              </div>
+              <div className="panel-muted p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/40">Category</p>
+                <p className="mt-2 text-lg font-bold text-white">
+                  {activeReviewProduct.category}
+                </p>
+              </div>
+            </div>
+
+            {activeReviewProduct.reviews?.length ? (
+              <div className="space-y-3">
+                {activeReviewProduct.reviews.map((review) => (
+                  <article key={review._id} className="panel-muted space-y-4 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-semibold text-white">{review.name}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((value) => (
+                            <Star
+                              key={`${review._id}-${value}`}
+                              size={14}
+                              className={
+                                value <= review.rating
+                                  ? "fill-amber-300 text-amber-300"
+                                  : "text-white/20"
+                              }
+                            />
+                          ))}
+                          <span className="text-sm text-white/55">
+                            {new Date(review.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEditingReview(review)}
+                          className="btn-secondary px-4 py-2"
+                        >
+                          <PencilLine size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReviewToDelete(review)}
+                          className="rounded-[10px] border border-rose-500/20 px-4 py-2 text-rose-300 transition hover:bg-rose-500/10"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {editingReview === review._id ? (
+                      <div className="space-y-3">
+                        <label className="block space-y-2">
+                          <span className="text-sm font-semibold text-white/75">Rating</span>
+                          <select
+                            value={reviewDraft.rating}
+                            onChange={(event) =>
+                              setReviewDraft((current) => ({
+                                ...current,
+                                rating: Number(event.target.value),
+                              }))
+                            }
+                            className="field"
+                          >
+                            {[5, 4, 3, 2, 1].map((rating) => (
+                              <option key={rating} value={rating}>
+                                {rating} star{rating > 1 ? "s" : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block space-y-2">
+                          <span className="text-sm font-semibold text-white/75">Comment</span>
+                          <textarea
+                            rows="3"
+                            value={reviewDraft.comment}
+                            onChange={(event) =>
+                              setReviewDraft((current) => ({
+                                ...current,
+                                comment: event.target.value,
+                              }))
+                            }
+                            className="field"
+                          />
+                        </label>
+                        <div className="flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEditingReview(null)}
+                            className="btn-secondary"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReviewSave(review._id)}
+                            disabled={reviewLoading}
+                            className="btn-primary gap-2 disabled:cursor-not-allowed"
+                          >
+                            {reviewLoading ? (
+                              <LoaderCircle size={16} className="animate-spin" />
+                            ) : null}
+                            {reviewLoading ? "Saving..." : "Save review"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm leading-6 text-white/70">{review.comment}</p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-white/50">This product does not have reviews yet.</p>
+            )}
+          </div>
+        ) : null}
+      </AppModal>
+
+      <ConfirmModal
+        isOpen={Boolean(reviewToDelete)}
+        onClose={() => setReviewToDelete(null)}
+        onConfirm={handleReviewDelete}
+        title="Delete review?"
+        description="This will permanently remove the selected review from the product."
+        confirmLabel="Delete review"
+        loadingLabel="Deleting..."
+        isLoading={reviewLoading}
       />
     </section>
   );

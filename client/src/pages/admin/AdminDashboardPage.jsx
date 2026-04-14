@@ -100,6 +100,19 @@ function AdminDashboardPage() {
         />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <AdminStatCard
+          label="Total Reviews"
+          value={stats?.totalReviews || 0}
+          hint="All product reviews currently stored"
+        />
+        <AdminStatCard
+          label="Average Rating"
+          value={(stats?.averageStoreRating || 0).toFixed(1)}
+          hint="Average rating across reviewed products"
+        />
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="panel p-6">
           <div className="mb-5">
