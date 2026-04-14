@@ -6,7 +6,11 @@ import toast from "react-hot-toast";
 import AppModal from "../components/common/AppModal";
 import ConfirmModal from "../components/common/ConfirmModal";
 import StatusMessage from "../components/common/StatusMessage";
-import { cancelMyOrder, fetchMyOrders } from "../features/orders/orderSlice";
+import {
+  cancelMyOrder,
+  continuePaymongoPayment,
+  fetchMyOrders,
+} from "../features/orders/orderSlice";
 import { addCartItem, openCartDrawer } from "../features/cart/cartSlice";
 import { formatCurrency } from "../utils/formatCurrency";
 
@@ -32,6 +36,7 @@ function OrdersPage() {
   const [isReordering, setIsReordering] = useState(false);
   const [pendingCancelOrder, setPendingCancelOrder] = useState(null);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
+  const [payingOrderId, setPayingOrderId] = useState(null);
 
   useEffect(() => {
     dispatch(fetchMyOrders());
@@ -43,6 +48,10 @@ function OrdersPage() {
   );
   const canCancelOrder = (order) =>
     ["pending", "need_payment"].includes(order.orderStatus);
+  const canContinuePayment = (order) =>
+    order.paymentMethod === "gcash" &&
+    order.paymentStatus !== "paid" &&
+    order.orderStatus === "need_payment";
 
   const handleReorder = async (order) => {
     const availableItems = order.orderItems.filter((item) => item.isAvailable);
@@ -101,6 +110,19 @@ function OrdersPage() {
     }
 
     setIsCancellingOrder(false);
+  };
+
+  const handleContinuePayment = async (order) => {
+    setPayingOrderId(order._id);
+    const result = await dispatch(continuePaymongoPayment(order._id));
+
+    if (continuePaymongoPayment.fulfilled.match(result) && result.payload.checkoutUrl) {
+      window.location.href = result.payload.checkoutUrl;
+      return;
+    }
+
+    toast.error(result.payload || "We could not continue the GCash payment.");
+    setPayingOrderId(null);
   };
 
   return (
@@ -193,6 +215,21 @@ function OrdersPage() {
                   >
                     {isReordering ? <LoaderCircle size={16} className="animate-spin" /> : <RotateCcw size={16} />}
                     {isReordering ? "Adding..." : "Order Again"}
+                  </button>
+                ) : null}
+                {canContinuePayment(order) ? (
+                  <button
+                    type="button"
+                    onClick={() => handleContinuePayment(order)}
+                    disabled={payingOrderId === order._id}
+                    className="inline-flex items-center gap-2 rounded-[10px] border border-cyan-200 px-4 py-2 text-sm font-semibold text-cyan-700 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                  >
+                    {payingOrderId === order._id ? (
+                      <LoaderCircle size={16} className="animate-spin" />
+                    ) : (
+                      <RotateCcw size={16} />
+                    )}
+                    {payingOrderId === order._id ? "Redirecting..." : "Continue GCash"}
                   </button>
                 ) : null}
                 {canCancelOrder(order) ? (

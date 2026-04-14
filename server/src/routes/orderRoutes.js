@@ -3,6 +3,8 @@ const { body, param } = require("express-validator");
 
 const {
   cancelMyOrder,
+  confirmPaymongoOrder,
+  createPaymongoCheckoutForExistingOrder,
   createAdminOrder,
   createOrder,
   deleteAdminOrder,
@@ -27,6 +29,18 @@ router.put(
   ],
   validateRequest,
   cancelMyOrder
+);
+router.post(
+  "/:id/paymongo/checkout",
+  [param("id").isMongoId().withMessage("A valid order id is required.")],
+  validateRequest,
+  createPaymongoCheckoutForExistingOrder
+);
+router.put(
+  "/:id/paymongo/confirm",
+  [param("id").isMongoId().withMessage("A valid order id is required.")],
+  validateRequest,
+  confirmPaymongoOrder
 );
 router.get("/admin", adminOnly, getAllOrders);
 router.post(

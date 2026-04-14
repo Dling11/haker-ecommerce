@@ -90,10 +90,12 @@ const cartSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(createOrder.fulfilled, (state) => {
+      .addCase(createOrder.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.cart = { items: [], itemsPrice: 0 };
-        state.isDrawerOpen = false;
+        if (action.payload?.order) {
+          state.cart = { items: [], itemsPrice: 0 };
+          state.isDrawerOpen = false;
+        }
       })
       .addMatcher(
         (action) =>

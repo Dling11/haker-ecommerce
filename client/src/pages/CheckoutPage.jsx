@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import StatusMessage from "../components/common/StatusMessage";
-import { clearLatestOrder, createOrder } from "../features/orders/orderSlice";
+import {
+  clearLatestOrder,
+  confirmPaymongoOrder,
+  createOrder,
+} from "../features/orders/orderSlice";
 import { formatCurrency } from "../utils/formatCurrency";
 
 const checkoutFieldClassName =
@@ -13,9 +17,10 @@ const checkoutFieldClassName =
 function CheckoutPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { cart } = useSelector((state) => state.cart);
   const { user } = useSelector((state) => state.auth);
-  const { isLoading, error, latestOrder } = useSelector((state) => state.orders);
+  const { isLoading, error } = useSelector((state) => state.orders);
   const { settings } = useSelector((state) => state.site);
 
   const [formData, setFormData] = useState({
@@ -27,7 +32,6 @@ function CheckoutPage() {
     postalCode: user?.shippingAddress?.postalCode || "",
     country: user?.shippingAddress?.country || "Philippines",
     paymentMethod: "cod",
-    gcashReference: "",
     notes: "",
   });
   const isCheckoutDisabled = settings?.allowCheckout === false;
@@ -35,12 +39,43 @@ function CheckoutPage() {
   const isCodDisabled = settings?.allowCashOnDelivery === false;
   const isGCashDisabled = settings?.allowGCash === false;
 
+  const paymentState = searchParams.get("payment");
+  const orderId = searchParams.get("orderId");
+  const checkoutSessionId = searchParams.get("checkout_session_id");
+
   useEffect(() => {
-    if (latestOrder) {
-      navigate("/shop/orders", { replace: true });
-      dispatch(clearLatestOrder());
+    if (!paymentState || !orderId || paymentState !== "success") {
+      return;
     }
-  }, [dispatch, latestOrder, navigate]);
+
+    const verifyPayment = async () => {
+      const result = await dispatch(
+        confirmPaymongoOrder({
+          orderId,
+          checkoutSessionId,
+        })
+      );
+
+      if (confirmPaymongoOrder.fulfilled.match(result)) {
+        toast.success("GCash payment confirmed.");
+        dispatch(clearLatestOrder());
+        setSearchParams({});
+        navigate("/shop/orders", { replace: true });
+      } else {
+        toast.error(result.payload || "We could not confirm your GCash payment yet.");
+      }
+    };
+
+    verifyPayment();
+  }, [checkoutSessionId, dispatch, navigate, orderId, paymentState, setSearchParams]);
+
+  useEffect(() => {
+    if (paymentState === "cancelled") {
+      toast("GCash checkout was cancelled. You can try again from your pending order.");
+      setSearchParams({});
+      navigate("/shop/orders", { replace: true });
+    }
+  }, [navigate, paymentState, setSearchParams]);
 
   useEffect(() => {
     if (formData.paymentMethod === "cod" && isCodDisabled && !isGCashDisabled) {
@@ -80,13 +115,19 @@ function CheckoutPage() {
           country: formData.country,
         },
         paymentMethod: formData.paymentMethod,
-        gcashReference: formData.gcashReference,
         notes: formData.notes,
       })
     );
 
     if (createOrder.fulfilled.match(result)) {
+      if (result.payload.requiresPaymentRedirect && result.payload.checkoutUrl) {
+        window.location.href = result.payload.checkoutUrl;
+        return;
+      }
+
       toast.success("Order placed successfully.");
+      dispatch(clearLatestOrder());
+      navigate("/shop/orders", { replace: true });
     } else if (createOrder.rejected.match(result)) {
       toast.error(result.payload || "Failed to place order.");
     }
@@ -221,22 +262,16 @@ function CheckoutPage() {
               onChange={handleChange}
               disabled={isGCashDisabled}
             />
-            <span>GCash (simulated manual payment)</span>
+            <span>GCash via PayMongo</span>
           </label>
         </div>
 
         {formData.paymentMethod === "gcash" ? (
-          <label className="space-y-2 block">
-            <span className="text-sm font-semibold text-slate-700">GCash reference</span>
-            <input
-              name="gcashReference"
-              value={formData.gcashReference}
-              onChange={handleChange}
-              className={checkoutFieldClassName}
-              placeholder="Reference number or screenshot id"
-              required
-            />
-          </label>
+          <div className="rounded-[10px] border border-violet-100 bg-violet-50/60 px-4 py-4 text-sm text-slate-600">
+            You will be redirected to PayMongo to complete your GCash payment securely.
+            After successful payment, we will confirm the transaction and move your order
+            into processing automatically.
+          </div>
         ) : null}
 
         <label className="space-y-2 block">
@@ -255,6 +290,7 @@ function CheckoutPage() {
           type="submit"
           disabled={
             isLoading ||
+            (paymentState === "success" && Boolean(orderId)) ||
             cart.items.length === 0 ||
             isCheckoutDisabled ||
             isMaintenanceMode ||
@@ -263,7 +299,13 @@ function CheckoutPage() {
           }
           className="w-full rounded-[10px] bg-violet-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
         >
-          {isLoading ? "Placing order..." : "Place Order"}
+          {isLoading
+            ? paymentState === "success"
+              ? "Confirming payment..."
+              : "Placing order..."
+            : formData.paymentMethod === "gcash"
+              ? "Continue to GCash"
+              : "Place Order"}
         </button>
       </form>
 

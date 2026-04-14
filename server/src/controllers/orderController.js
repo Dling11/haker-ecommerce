@@ -8,6 +8,10 @@ const {
   sendOrderConfirmationEmail,
   sendOrderStatusEmail,
 } = require("../services/emailService");
+const {
+  createGcashCheckoutSession,
+  retrieveCheckoutSession,
+} = require("../services/paymongoService");
 const { sendOrderStatusSms } = require("../services/smsService");
 
 const userCancellableStatuses = ["pending", "need_payment"];
@@ -102,6 +106,28 @@ const calculateTotals = (orderItems) => {
   return { itemsPrice, shippingPrice, taxPrice, totalPrice };
 };
 
+const clearUserCart = async (userId) => {
+  const cart = await Cart.findOne({ user: userId });
+
+  if (!cart) {
+    return;
+  }
+
+  cart.items = [];
+  cart.itemsPrice = 0;
+  await cart.save();
+};
+
+const decrementOrderStock = async (orderItems) => {
+  await Promise.all(
+    orderItems.map((item) =>
+      Product.findByIdAndUpdate(item.product, {
+        $inc: { stock: -item.quantity },
+      })
+    )
+  );
+};
+
 const enrichOrdersWithAvailability = async (orders) => {
   const normalizedOrders = Array.isArray(orders) ? orders : [orders];
   const productIds = [
@@ -140,7 +166,7 @@ const enrichOrdersWithAvailability = async (orders) => {
 };
 
 const createOrder = asyncHandler(async (req, res) => {
-  const { shippingAddress, paymentMethod, gcashReference, notes } = req.body;
+  const { shippingAddress, paymentMethod, notes } = req.body;
   const settings = await getSiteSettings();
   const cart = await Cart.findOne({ user: req.user._id });
 
@@ -186,10 +212,10 @@ const createOrder = asyncHandler(async (req, res) => {
     })),
     shippingAddress,
     paymentMethod,
-    paymentStatus: paymentMethod === "gcash" ? "paid" : "pending",
-    paidAt: paymentMethod === "gcash" ? new Date() : null,
-    orderStatus: paymentMethod === "gcash" ? "processing" : "pending",
-    gcashReference: paymentMethod === "gcash" ? gcashReference || "" : "",
+    paymentStatus: "pending",
+    paidAt: null,
+    orderStatus: paymentMethod === "gcash" ? "need_payment" : "pending",
+    gcashReference: "",
     notes: notes || "",
     itemsPrice,
     shippingPrice,
@@ -197,15 +223,36 @@ const createOrder = asyncHandler(async (req, res) => {
     totalPrice,
   });
 
-  for (const item of cart.items) {
-    await Product.findByIdAndUpdate(item.product, {
-      $inc: { stock: -item.quantity },
-    });
+  await decrementOrderStock(cart.items);
+
+  if (paymentMethod === "gcash") {
+    try {
+      const { checkoutSessionId, checkoutUrl } = await createGcashCheckoutSession({
+        order,
+        user: req.user,
+      });
+
+      order.paymongoCheckoutSessionId = checkoutSessionId || "";
+      await order.save();
+      await clearUserCart(req.user._id);
+
+      res.status(201).json({
+        success: true,
+        message: "Redirecting to GCash payment.",
+        order,
+        requiresPaymentRedirect: true,
+        checkoutUrl,
+      });
+      return;
+    } catch (error) {
+      await restoreOrderStock(order);
+      await order.deleteOne();
+      res.status(500);
+      throw new Error(error.message || "We could not start the GCash payment session.");
+    }
   }
 
-  cart.items = [];
-  cart.itemsPrice = 0;
-  await cart.save();
+  await clearUserCart(req.user._id);
 
   if (settings.emailSystemEnabled && req.user.isEmailVerified) {
     try {
@@ -222,6 +269,149 @@ const createOrder = asyncHandler(async (req, res) => {
   res.status(201).json({
     success: true,
     message: "Order placed successfully.",
+    order,
+    requiresPaymentRedirect: false,
+  });
+});
+
+const createPaymongoCheckoutForExistingOrder = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const settings = await getSiteSettings();
+  const order = await Order.findById(id).populate("user", "name email");
+
+  if (!order) {
+    res.status(404);
+    throw new Error("Order not found.");
+  }
+
+  if (order.user._id.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error("You are not allowed to continue payment for this order.");
+  }
+
+  if (!settings.allowCheckout || !settings.allowGCash) {
+    res.status(403);
+    throw new Error("GCash checkout is currently unavailable.");
+  }
+
+  if (order.paymentMethod !== "gcash") {
+    res.status(400);
+    throw new Error("This order does not use GCash.");
+  }
+
+  if (order.paymentStatus === "paid") {
+    res.status(400);
+    throw new Error("This order has already been paid.");
+  }
+
+  if (order.orderStatus === "cancelled") {
+    res.status(400);
+    throw new Error("Cancelled orders can no longer be paid.");
+  }
+
+  const { checkoutSessionId, checkoutUrl } = await createGcashCheckoutSession({
+    order,
+    user: req.user,
+  });
+
+  order.paymongoCheckoutSessionId = checkoutSessionId || "";
+  order.orderStatus = "need_payment";
+  await order.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Redirecting to GCash payment.",
+    checkoutUrl,
+    order,
+  });
+});
+
+const confirmPaymongoOrder = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { checkoutSessionId } = req.body;
+  const settings = await getSiteSettings();
+
+  const order = await Order.findById(id);
+
+  if (!order) {
+    res.status(404);
+    throw new Error("Order not found.");
+  }
+
+  if (order.user.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error("You are not allowed to confirm this order.");
+  }
+
+  if (order.paymentMethod !== "gcash") {
+    res.status(400);
+    throw new Error("This order does not use GCash.");
+  }
+
+  const resolvedSessionId = checkoutSessionId || order.paymongoCheckoutSessionId;
+
+  if (!resolvedSessionId) {
+    res.status(400);
+    throw new Error("Missing PayMongo checkout session id.");
+  }
+
+  if (order.paymongoCheckoutSessionId && order.paymongoCheckoutSessionId !== resolvedSessionId) {
+    res.status(400);
+    throw new Error("Checkout session mismatch.");
+  }
+
+  const session = await retrieveCheckoutSession(resolvedSessionId);
+  const sessionAttributes = session?.data?.attributes || {};
+  const payment = sessionAttributes.payments?.[0]?.attributes;
+  const paymentIntent = sessionAttributes.payment_intent?.attributes;
+  const isPaid =
+    payment?.status === "paid" ||
+    paymentIntent?.status === "succeeded";
+
+  if (!isPaid) {
+    res.status(400);
+    throw new Error("GCash payment has not been completed yet.");
+  }
+
+  const wasAlreadyPaid = order.paymentStatus === "paid";
+
+  order.paymongoCheckoutSessionId = resolvedSessionId;
+  order.paymongoPaymentId = sessionAttributes.payments?.[0]?.id || order.paymongoPaymentId;
+  order.paymongoPaymentIntentId =
+    sessionAttributes.payment_intent?.id || order.paymongoPaymentIntentId;
+  order.gcashReference =
+    sessionAttributes.payments?.[0]?.id ||
+    sessionAttributes.payment_intent?.id ||
+    resolvedSessionId;
+
+  if (order.paymentStatus !== "paid") {
+    order.paymentStatus = "paid";
+    order.paidAt = payment?.paid_at
+      ? new Date(payment.paid_at * 1000)
+      : order.paidAt || new Date();
+  }
+
+  if (order.orderStatus === "need_payment" || order.orderStatus === "pending") {
+    order.orderStatus = "processing";
+  }
+
+  await order.save();
+
+  if (!wasAlreadyPaid && settings.emailSystemEnabled && req.user.isEmailVerified) {
+    try {
+      await sendOrderConfirmationEmail({
+        to: req.user.email,
+        user: req.user,
+        order,
+      });
+    } catch (error) {
+      console.error("Failed to send order confirmation email:", error.message);
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "GCash payment confirmed successfully.",
     order,
   });
 });
@@ -559,6 +749,8 @@ const cancelMyOrder = asyncHandler(async (req, res) => {
 
 module.exports = {
   cancelMyOrder,
+  confirmPaymongoOrder,
+  createPaymongoCheckoutForExistingOrder,
   createAdminOrder,
   createOrder,
   deleteAdminOrder,

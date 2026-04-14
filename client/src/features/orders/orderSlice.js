@@ -8,7 +8,33 @@ export const createOrder = createAsyncThunk(
   async (orderData, thunkAPI) => {
     try {
       const { data } = await api.post("/orders", orderData);
+      return data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const confirmPaymongoOrder = createAsyncThunk(
+  "orders/confirmPaymongoOrder",
+  async ({ orderId, checkoutSessionId }, thunkAPI) => {
+    try {
+      const { data } = await api.put(`/orders/${orderId}/paymongo/confirm`, {
+        checkoutSessionId,
+      });
       return data.order;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const continuePaymongoPayment = createAsyncThunk(
+  "orders/continuePaymongoPayment",
+  async (orderId, thunkAPI) => {
+    try {
+      const { data } = await api.post(`/orders/${orderId}/paymongo/checkout`);
+      return data;
     } catch (error) {
       return thunkAPI.rejectWithValue(getErrorMessage(error));
     }
@@ -58,8 +84,17 @@ const orderSlice = createSlice({
     builder
       .addCase(createOrder.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.latestOrder = action.payload.order;
+        if (action.payload.order) {
+          state.items.unshift(action.payload.order);
+        }
+      })
+      .addCase(confirmPaymongoOrder.fulfilled, (state, action) => {
+        state.isLoading = false;
         state.latestOrder = action.payload;
-        state.items.unshift(action.payload);
+        state.items = state.items.map((order) =>
+          order._id === action.payload._id ? action.payload : order
+        );
       })
       .addCase(fetchMyOrders.fulfilled, (state, action) => {
         state.isLoading = false;

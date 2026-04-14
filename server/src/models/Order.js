@@ -73,6 +73,22 @@ const orderSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    paymongoCheckoutSessionId: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
+    },
+    paymongoPaymentIntentId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    paymongoPaymentId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     notes: {
       type: String,
       trim: true,
