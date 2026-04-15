@@ -1,49 +1,35 @@
 import { Bell, Package, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 
-import { fetchDashboardStats } from "../../features/admin/adminSlice";
+import {
+  fetchAdminNotifications,
+  markAdminNotificationRead,
+  markAllAdminNotificationsRead,
+} from "../../features/admin/adminSlice";
+import useVisibleInterval from "../../hooks/useVisibleInterval";
+import formatRelativeTime from "../../utils/formatRelativeTime";
 
-const formatRelativeTime = (value) => {
-  const timestamp = new Date(value).getTime();
-
-  if (Number.isNaN(timestamp)) {
-    return "";
-  }
-
-  const diffInSeconds = Math.round((timestamp - Date.now()) / 1000);
-  const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-  const units = [
-    { unit: "day", seconds: 86400 },
-    { unit: "hour", seconds: 3600 },
-    { unit: "minute", seconds: 60 },
-  ];
-
-  for (const { unit, seconds } of units) {
-    if (Math.abs(diffInSeconds) >= seconds || unit === "minute") {
-      return formatter.format(Math.round(diffInSeconds / seconds), unit);
-    }
-  }
-
-  return "just now";
-};
+const ADMIN_ACTIVITY_POLL_INTERVAL_MS = 20000;
 
 function AdminTopbar() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
-  const { stats } = useSelector((state) => state.admin);
+  const { notifications, unreadNotificationsCount } = useSelector((state) => state.admin);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const notificationsRef = useRef(null);
-  const activityFeed = stats?.activityFeed || [];
-  const notificationPreview = useMemo(() => activityFeed.slice(0, 5), [activityFeed]);
-  const unreadCount = Math.min(activityFeed.length, 9);
+  const notificationPreview = useMemo(() => notifications.slice(0, 5), [notifications]);
+  const displayBadgeCount = Math.min(unreadNotificationsCount, 9);
 
   useEffect(() => {
-    if (!stats) {
-      dispatch(fetchDashboardStats());
-    }
-  }, [dispatch, stats]);
+    dispatch(fetchAdminNotifications());
+  }, [dispatch]);
+
+  useVisibleInterval(() => {
+    dispatch(fetchAdminNotifications());
+  }, ADMIN_ACTIVITY_POLL_INTERVAL_MS);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -58,6 +44,12 @@ function AdminTopbar() {
       document.removeEventListener("mousedown", handlePointerDown);
     };
   }, []);
+
+  const handleViewNotification = (item) => {
+    dispatch(markAdminNotificationRead(item._id));
+    setIsNotificationsOpen(false);
+    navigate(item.route || (item.type === "order_placed" ? "/admin/orders" : "/admin/users"));
+  };
 
   return (
     <div className="panel relative z-20 flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
@@ -79,9 +71,9 @@ function AdminTopbar() {
             aria-label="Toggle notifications"
           >
             <Bell size={18} />
-            {unreadCount ? (
+            {displayBadgeCount ? (
               <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-[0_0_0_4px_rgba(9,11,15,0.85)]">
-                {unreadCount}
+                {displayBadgeCount}
               </span>
             ) : null}
           </button>
@@ -89,38 +81,74 @@ function AdminTopbar() {
           {isNotificationsOpen ? (
             <div className="absolute right-0 z-50 mt-3 w-[340px] overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#0e1319]/95 shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur">
               <div className="border-b border-white/8 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-accent-600">
-                  Notifications
-                </p>
-                <p className="mt-2 text-sm text-white/55">
-                  Recent orders and registrations across the store.
-                </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-accent-600">
+                      Notifications
+                    </p>
+                    <p className="mt-2 text-sm text-white/55">
+                      Recent orders and registrations across the store.
+                    </p>
+                  </div>
+                  {unreadNotificationsCount ? (
+                    <button
+                      type="button"
+                      onClick={() => dispatch(markAllAdminNotificationsRead())}
+                      className="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60 transition hover:border-accent-500/40 hover:text-white"
+                    >
+                      Read all
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
-              <div className="max-h-[360px] space-y-1 overflow-y-auto p-3">
+              <div className="theme-scrollbar max-h-[360px] space-y-1 overflow-y-auto p-3">
                 {notificationPreview.length ? (
                   notificationPreview.map((item) => (
                     <div
                       key={item._id}
-                      className="flex items-start gap-3 rounded-[1rem] px-3 py-3 text-sm transition hover:bg-white/[0.04]"
+                      className="rounded-[1rem] border border-white/6 bg-white/[0.02] px-3 py-3 text-sm transition hover:bg-white/[0.04]"
                     >
-                      <span className="mt-0.5 rounded-full bg-white/8 p-2 text-accent-600">
-                        {item.type === "order" ? <Package size={14} /> : <UserPlus size={14} />}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="line-clamp-2 font-semibold text-white">{item.title}</p>
-                          <span className="shrink-0 text-[11px] font-medium text-white/35">
-                            {formatRelativeTime(item.createdAt)}
-                          </span>
+                      <div className="flex items-start gap-3">
+                        <span className="mt-0.5 rounded-full bg-white/8 p-2 text-accent-600">
+                          {item.type === "order_placed" ? (
+                            <Package size={14} />
+                          ) : (
+                            <UserPlus size={14} />
+                          )}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="line-clamp-2 font-semibold text-white">{item.title}</p>
+                            <span className="shrink-0 text-[11px] font-medium text-white/35">
+                              {formatRelativeTime(item.createdAt)}
+                            </span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs text-white/45">{item.subtitle}</p>
                         </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-white/45">{item.subtitle}</p>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => dispatch(markAdminNotificationRead(item._id))}
+                          className="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55 transition hover:border-white/20 hover:text-white"
+                        >
+                          Read
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleViewNotification(item)}
+                          className="rounded-full bg-accent-500/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-100 transition hover:bg-accent-500/18"
+                        >
+                          View
+                        </button>
                       </div>
                     </div>
                   ))
                 ) : (
                   <div className="px-3 py-6 text-center text-sm text-white/45">
-                    No recent activity yet.
+                    You&apos;re all caught up.
                   </div>
                 )}
               </div>

@@ -15,6 +15,42 @@ export const fetchDashboardStats = createAsyncThunk(
   }
 );
 
+export const fetchAdminNotifications = createAsyncThunk(
+  "admin/fetchAdminNotifications",
+  async (_, thunkAPI) => {
+    try {
+      const { data } = await api.get("/admin/notifications");
+      return data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const markAdminNotificationRead = createAsyncThunk(
+  "admin/markAdminNotificationRead",
+  async (notificationId, thunkAPI) => {
+    try {
+      const { data } = await api.patch(`/admin/notifications/${notificationId}/read`);
+      return data.notification;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
+export const markAllAdminNotificationsRead = createAsyncThunk(
+  "admin/markAllAdminNotificationsRead",
+  async (_, thunkAPI) => {
+    try {
+      await api.patch("/admin/notifications/read-all");
+      return true;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
 export const fetchAdminSiteSettings = createAsyncThunk(
   "admin/fetchAdminSiteSettings",
   async (_, thunkAPI) => {
@@ -184,6 +220,8 @@ export const deleteAdminImage = createAsyncThunk(
 
 const initialState = {
   stats: null,
+  notifications: [],
+  unreadNotificationsCount: 0,
   siteSettings: null,
   users: [],
   usersPagination: null,
@@ -192,6 +230,7 @@ const initialState = {
   isLoading: false,
   error: null,
   uploadLoading: false,
+  notificationsLoading: false,
   uploadedImage: null,
 };
 
@@ -208,6 +247,24 @@ const adminSlice = createSlice({
       .addCase(fetchDashboardStats.fulfilled, (state, action) => {
         state.isLoading = false;
         state.stats = action.payload;
+      })
+      .addCase(fetchAdminNotifications.fulfilled, (state, action) => {
+        state.notificationsLoading = false;
+        state.notifications = action.payload.notifications;
+        state.unreadNotificationsCount = action.payload.unreadCount;
+      })
+      .addCase(markAdminNotificationRead.fulfilled, (state, action) => {
+        state.notificationsLoading = false;
+        const nextNotifications = state.notifications.filter(
+          (notification) => notification._id !== action.payload._id
+        );
+        state.notifications = nextNotifications;
+        state.unreadNotificationsCount = nextNotifications.length;
+      })
+      .addCase(markAllAdminNotificationsRead.fulfilled, (state) => {
+        state.notificationsLoading = false;
+        state.notifications = [];
+        state.unreadNotificationsCount = 0;
       })
       .addCase(fetchAdminSiteSettings.fulfilled, (state, action) => {
         state.isLoading = false;
@@ -273,8 +330,31 @@ const adminSlice = createSlice({
       })
       .addMatcher(
         (action) =>
+          action.type === "admin/fetchAdminNotifications/pending" ||
+          action.type === "admin/markAdminNotificationRead/pending" ||
+          action.type === "admin/markAllAdminNotificationsRead/pending",
+        (state) => {
+          state.notificationsLoading = true;
+          state.error = null;
+        }
+      )
+      .addMatcher(
+        (action) =>
+          action.type === "admin/fetchAdminNotifications/rejected" ||
+          action.type === "admin/markAdminNotificationRead/rejected" ||
+          action.type === "admin/markAllAdminNotificationsRead/rejected",
+        (state, action) => {
+          state.notificationsLoading = false;
+          state.error = action.payload;
+        }
+      )
+      .addMatcher(
+        (action) =>
           action.type.startsWith("admin/") &&
           action.type.endsWith("/pending") &&
+          action.type !== "admin/fetchAdminNotifications/pending" &&
+          action.type !== "admin/markAdminNotificationRead/pending" &&
+          action.type !== "admin/markAllAdminNotificationsRead/pending" &&
           action.type !== "admin/uploadAdminImage/pending" &&
           action.type !== "admin/deleteAdminImage/pending",
         (state) => {
@@ -295,6 +375,9 @@ const adminSlice = createSlice({
         (action) =>
           action.type.startsWith("admin/") &&
           action.type.endsWith("/rejected") &&
+          action.type !== "admin/fetchAdminNotifications/rejected" &&
+          action.type !== "admin/markAdminNotificationRead/rejected" &&
+          action.type !== "admin/markAllAdminNotificationsRead/rejected" &&
           action.type !== "admin/uploadAdminImage/rejected" &&
           action.type !== "admin/deleteAdminImage/rejected",
         (state, action) => {

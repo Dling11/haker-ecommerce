@@ -23,6 +23,7 @@ const {
   sendPasswordResetEmail,
   sendVerificationOtpEmail,
 } = require("../services/emailService");
+const { createAdminNotification } = require("../services/notificationService");
 
 const buildUserPayload = (user) => ({
   _id: user._id,
@@ -78,6 +79,17 @@ const registerUser = asyncHandler(async (req, res) => {
     emailVerifiedAt:
       role === "admin" || !shouldRequireEmailVerification ? new Date() : null,
   });
+
+  if (role !== "admin") {
+    await createAdminNotification({
+      type: "user_registered",
+      title: `${user.name} registered`,
+      subtitle: user.email,
+      targetModel: "User",
+      targetId: user._id,
+      sourceKey: `user_registered:${user._id}`,
+    });
+  }
 
   if (role === "admin" || !shouldRequireEmailVerification) {
     const token = generateToken(user._id);

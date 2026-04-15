@@ -1,7 +1,12 @@
 const express = require("express");
-const { body } = require("express-validator");
+const { body, param } = require("express-validator");
 
 const { getDashboardStats } = require("../controllers/adminController");
+const {
+  getAdminNotifications,
+  readAdminNotification,
+  readAllAdminNotifications,
+} = require("../controllers/notificationController");
 const {
   getAdminSiteSettings,
   updateAdminSiteSettings,
@@ -14,6 +19,17 @@ const router = express.Router();
 router.use(protect, adminOnly);
 
 router.get("/stats", getDashboardStats);
+router.get("/notifications", getAdminNotifications);
+router.patch(
+  "/notifications/read-all",
+  readAllAdminNotifications
+);
+router.patch(
+  "/notifications/:id/read",
+  [param("id").isMongoId().withMessage("A valid notification id is required.")],
+  validateRequest,
+  readAdminNotification
+);
 router.get("/settings", getAdminSiteSettings);
 router.put(
   "/settings",

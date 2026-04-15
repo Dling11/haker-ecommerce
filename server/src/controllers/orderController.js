@@ -13,6 +13,7 @@ const {
   retrieveCheckoutSession,
 } = require("../services/paymongoService");
 const { sendOrderStatusSms } = require("../services/smsService");
+const { createAdminNotification } = require("../services/notificationService");
 
 const userCancellableStatuses = ["pending", "need_payment"];
 
@@ -235,6 +236,14 @@ const createOrder = asyncHandler(async (req, res) => {
       order.paymongoCheckoutSessionId = checkoutSessionId || "";
       await order.save();
       await clearUserCart(req.user._id);
+      await createAdminNotification({
+        type: "order_placed",
+        title: `Order #${order._id.toString().slice(-6).toUpperCase()} placed`,
+        subtitle: `${req.user.name} - ${req.user.email}`,
+        targetModel: "Order",
+        targetId: order._id,
+        sourceKey: `order_placed:${order._id}`,
+      });
 
       res.status(201).json({
         success: true,
@@ -253,6 +262,14 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 
   await clearUserCart(req.user._id);
+  await createAdminNotification({
+    type: "order_placed",
+    title: `Order #${order._id.toString().slice(-6).toUpperCase()} placed`,
+    subtitle: `${req.user.name} - ${req.user.email}`,
+    targetModel: "Order",
+    targetId: order._id,
+    sourceKey: `order_placed:${order._id}`,
+  });
 
   if (settings.emailSystemEnabled && req.user.isEmailVerified) {
     try {
