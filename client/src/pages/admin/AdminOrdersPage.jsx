@@ -1,5 +1,5 @@
 import { createColumnHelper } from "@tanstack/react-table";
-import { Eye, PencilLine, Plus, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Eye, LoaderCircle, PencilLine, Plus, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import toast from "react-hot-toast";
@@ -67,14 +67,17 @@ function AdminOrdersPage() {
   const [pendingDeleteOrder, setPendingDeleteOrder] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOption, setSortOption] = useState("newest");
   const [page, setPage] = useState(1);
+  const [hasRequestedOrders, setHasRequestedOrders] = useState(false);
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
+    setHasRequestedOrders(true);
     dispatch(
       fetchAdminOrders({
         keyword: debouncedSearch,
@@ -163,9 +166,11 @@ function AdminOrdersPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsSavingOrder(true);
 
     if (!editingOrder && !formData.userId) {
       toast.error("Please select a customer.");
+      setIsSavingOrder(false);
       return;
     }
 
@@ -174,6 +179,7 @@ function AdminOrdersPage() {
       formData.orderItems.some((item) => !item.productId || Number(item.quantity) < 1)
     ) {
       toast.error("Please complete each product line before creating the order.");
+      setIsSavingOrder(false);
       return;
     }
 
@@ -218,6 +224,8 @@ function AdminOrdersPage() {
     } else {
       toast.error(result.payload || "Failed to save order.");
     }
+
+    setIsSavingOrder(false);
   };
 
   const confirmDelete = async () => {
@@ -360,6 +368,9 @@ function AdminOrdersPage() {
     []
   );
 
+  const isOrdersInitialLoading = !hasRequestedOrders || (isLoading && orders.length === 0);
+  const isOrdersRefreshing = hasRequestedOrders && isLoading && orders.length > 0;
+
   return (
     <section className="space-y-4">
       <div className="panel p-6">
@@ -378,7 +389,12 @@ function AdminOrdersPage() {
             Create Order
           </button>
         </div>
-        {isLoading ? <p className="mt-2 text-sm text-white/45">Refreshing orders...</p> : null}
+        {isOrdersRefreshing ? (
+          <div className="mt-3 inline-flex items-center gap-2 text-sm text-white/50">
+            <LoaderCircle size={16} className="animate-spin" />
+            Refreshing orders...
+          </div>
+        ) : null}
       </div>
 
       <div className="panel p-4">
@@ -471,7 +487,21 @@ function AdminOrdersPage() {
 
       <StatusMessage type="error" message={error} />
 
-      <AdminDataTable columns={columns} data={orders} emptyMessage="No orders found." />
+      {isOrdersInitialLoading ? (
+        <div className="flex min-h-[18rem] flex-col items-center justify-center gap-4 rounded-[1.75rem] border border-white/60 bg-surface-panel/90 px-6 text-center shadow-panel">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-500/10 text-accent-600">
+            <LoaderCircle size={24} className="animate-spin" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-ink-700">Fetching orders</p>
+            <p className="text-sm text-ink-500">
+              We&apos;re loading the latest payment and fulfillment activity now.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <AdminDataTable columns={columns} data={orders} emptyMessage="No orders found." />
+      )}
       <PaginationControls pagination={ordersPagination} onPageChange={setPage} />
 
       <AppModal
@@ -643,8 +673,19 @@ function AdminOrdersPage() {
             <button type="button" onClick={closeModal} className="btn-secondary">
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
-              {editingOrder ? "Save Changes" : "Create Order"}
+            <button
+              type="submit"
+              disabled={isSavingOrder}
+              className="btn-primary gap-2 disabled:cursor-not-allowed"
+            >
+              {isSavingOrder ? <LoaderCircle size={16} className="animate-spin" /> : null}
+              {isSavingOrder
+                ? editingOrder
+                  ? "Saving..."
+                  : "Creating..."
+                : editingOrder
+                  ? "Save Changes"
+                  : "Create Order"}
             </button>
           </div>
         </form>

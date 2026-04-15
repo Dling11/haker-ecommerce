@@ -7,6 +7,7 @@ import {
   LinearScale,
   Tooltip,
 } from "chart.js";
+import { Package, UserPlus } from "lucide-react";
 import { useEffect } from "react";
 import { Bar, Doughnut } from "react-chartjs-2";
 import { useDispatch, useSelector } from "react-redux";
@@ -200,6 +201,46 @@ function AdminDashboardPage() {
               </div>
             </article>
           ))}
+        </div>
+      </div>
+
+      <div className="panel p-6">
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-accent-600">
+            Notifications
+          </p>
+          <h2 className="mt-2 text-2xl font-black text-brand-900">
+            New signups and order activity
+          </h2>
+        </div>
+
+        <div className="grid gap-3">
+          {(stats?.activityFeed || []).length ? (
+            stats.activityFeed.map((item) => (
+              <article
+                key={item._id}
+                className="flex items-start gap-4 rounded-[1.25rem] bg-surface-muted/60 p-4"
+              >
+                <div className="rounded-full bg-white px-3 py-3 text-accent-600 shadow-sm">
+                  {item.type === "order" ? <Package size={18} /> : <UserPlus size={18} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <h3 className="font-bold text-brand-900">{item.title}</h3>
+                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-500">
+                      {new Date(item.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-ink-500">{item.subtitle}</p>
+                  <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-accent-700">
+                    {item.meta?.replaceAll?.("_", " ") || item.meta}
+                  </p>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="text-sm text-ink-500">No recent notifications yet.</p>
+          )}
         </div>
       </div>
     </section>

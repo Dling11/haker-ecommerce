@@ -4,7 +4,15 @@ const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 
 const getDashboardStats = asyncHandler(async (req, res) => {
-  const [usersCount, ordersCount, productsCount, revenueResult, latestOrders, reviewStats] =
+  const [
+    usersCount,
+    ordersCount,
+    productsCount,
+    revenueResult,
+    latestOrders,
+    latestUsers,
+    reviewStats,
+  ] =
     await Promise.all([
       User.countDocuments(),
       Order.countDocuments(),
@@ -24,6 +32,10 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       ]),
       Order.find({})
         .populate("user", "name email")
+        .sort({ createdAt: -1 })
+        .limit(5),
+      User.find({})
+        .select("name email role createdAt")
         .sort({ createdAt: -1 })
         .limit(5),
       Product.aggregate([
@@ -57,6 +69,24 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     return accumulator;
   }, {});
 
+  const activityFeed = [...latestOrders.map((order) => ({
+    _id: `order-${order._id}`,
+    type: "order",
+    createdAt: order.createdAt,
+    title: `Order #${order._id.toString().slice(-6).toUpperCase()} placed`,
+    subtitle: `${order.user?.name || "Unknown customer"} - ${order.user?.email || "No email"}`,
+    meta: order.orderStatus,
+  })), ...latestUsers.map((user) => ({
+    _id: `user-${user._id}`,
+    type: "user",
+    createdAt: user.createdAt,
+    title: `${user.name || "New user"} registered`,
+    subtitle: user.email || "No email",
+    meta: user.role,
+  }))]
+    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
+    .slice(0, 8);
+
   res.status(200).json({
     success: true,
     stats: {
@@ -68,6 +98,8 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       totalRevenue: revenueResult[0]?.totalRevenue || 0,
       statusBreakdown,
       latestOrders,
+      latestUsers,
+      activityFeed,
     },
   });
 });

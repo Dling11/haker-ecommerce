@@ -63,16 +63,19 @@ function AdminUsersPage() {
   const [pendingRoleChange, setPendingRoleChange] = useState(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+  const [isSavingUser, setIsSavingUser] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOption, setSortOption] = useState("newest");
   const [page, setPage] = useState(1);
+  const [hasRequestedUsers, setHasRequestedUsers] = useState(false);
   const currentEditingUser = users.find((user) => user._id === editingUserId);
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   useEffect(() => {
+    setHasRequestedUsers(true);
     dispatch(
       fetchUsers({
         keyword: debouncedSearch,
@@ -182,6 +185,7 @@ function AdminUsersPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setIsSavingUser(true);
 
     const payload = buildPayload();
 
@@ -191,6 +195,7 @@ function AdminUsersPage() {
         ...payload,
         name: payload.name,
       });
+      setIsSavingUser(false);
       return;
     }
 
@@ -204,6 +209,8 @@ function AdminUsersPage() {
     } else if (createAdminUser.rejected.match(result) || updateUserManagement.rejected.match(result)) {
       toast.error(result.payload || "Failed to save user.");
     }
+
+    setIsSavingUser(false);
   };
 
   const confirmDelete = async () => {
@@ -347,6 +354,9 @@ function AdminUsersPage() {
     []
   );
 
+  const isUsersInitialLoading = !hasRequestedUsers || (isLoading && users.length === 0);
+  const isUsersRefreshing = hasRequestedUsers && isLoading && users.length > 0;
+
   return (
     <section className="space-y-4">
       <div className="panel p-6">
@@ -365,7 +375,12 @@ function AdminUsersPage() {
             Add User
           </button>
         </div>
-        {isLoading ? <p className="mt-2 text-sm text-white/45">Refreshing users...</p> : null}
+        {isUsersRefreshing ? (
+          <div className="mt-3 inline-flex items-center gap-2 text-sm text-white/50">
+            <LoaderCircle size={16} className="animate-spin" />
+            Refreshing users...
+          </div>
+        ) : null}
       </div>
 
       <div className="panel p-4">
@@ -457,7 +472,21 @@ function AdminUsersPage() {
 
       <StatusMessage type="error" message={error} />
 
-      <AdminDataTable columns={columns} data={users} emptyMessage="No users found." />
+      {isUsersInitialLoading ? (
+        <div className="flex min-h-[18rem] flex-col items-center justify-center gap-4 rounded-[1.75rem] border border-white/60 bg-surface-panel/90 px-6 text-center shadow-panel">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-500/10 text-accent-600">
+            <LoaderCircle size={24} className="animate-spin" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-ink-700">Fetching users</p>
+            <p className="text-sm text-ink-500">
+              Loading the latest customer and admin account activity now.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <AdminDataTable columns={columns} data={users} emptyMessage="No users found." />
+      )}
       <PaginationControls pagination={usersPagination} onPageChange={setPage} />
 
       <AppModal
@@ -681,8 +710,19 @@ function AdminUsersPage() {
             <button type="button" onClick={closeFormModal} className="btn-secondary">
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
-              {editingUserId ? "Save Changes" : "Create User"}
+            <button
+              type="submit"
+              disabled={isSavingUser}
+              className="btn-primary gap-2 disabled:cursor-not-allowed"
+            >
+              {isSavingUser ? <LoaderCircle size={16} className="animate-spin" /> : null}
+              {isSavingUser
+                ? editingUserId
+                  ? "Saving..."
+                  : "Creating..."
+                : editingUserId
+                  ? "Save Changes"
+                  : "Create User"}
             </button>
           </div>
         </form>
