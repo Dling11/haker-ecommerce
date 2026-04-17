@@ -210,6 +210,8 @@ const createOrder = asyncHandler(async (req, res) => {
       image: item.image,
       price: item.price,
       quantity: item.quantity,
+      color: item.color || "",
+      size: item.size || "",
     })),
     shippingAddress,
     paymentMethod,
@@ -473,6 +475,8 @@ const createAdminOrder = asyncHandler(async (req, res) => {
       image: product.images?.[0]?.url || "",
       price: product.price,
       quantity: item.quantity,
+      color: item.color || "",
+      size: item.size || "",
     });
   }
 

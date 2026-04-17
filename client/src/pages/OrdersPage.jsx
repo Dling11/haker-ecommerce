@@ -12,6 +12,7 @@ import {
   fetchMyOrders,
 } from "../features/orders/orderSlice";
 import { addCartItem, openCartDrawer } from "../features/cart/cartSlice";
+import { getColorOptionLabel } from "../utils/colorOptions";
 import { formatCurrency } from "../utils/formatCurrency";
 
 const orderToneMap = {
@@ -69,6 +70,8 @@ function OrdersPage() {
         addCartItem({
           productId: item.product,
           quantity: Math.max(1, Math.min(item.quantity, item.availableQuantity || item.quantity)),
+          color: item.color || "",
+          size: item.size || "",
         })
       );
 
@@ -307,6 +310,13 @@ function OrdersPage() {
                       <p className="mt-1 text-sm text-slate-500">
                         {item.quantity} x {formatCurrency(item.price)}
                       </p>
+                      {item.color || item.size ? (
+                        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">
+                          {[item.color ? getColorOptionLabel(item.color) : "", item.size]
+                            .filter(Boolean)
+                            .join(" / ")}
+                        </p>
+                      ) : null}
                       <p className="mt-2 text-sm text-slate-500">
                         Current availability:{" "}
                         <span className={item.isAvailable ? "font-semibold text-emerald-700" : "font-semibold text-rose-600"}>

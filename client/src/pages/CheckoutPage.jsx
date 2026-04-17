@@ -9,6 +9,7 @@ import {
   confirmPaymongoOrder,
   createOrder,
 } from "../features/orders/orderSlice";
+import { getColorOptionLabel } from "../utils/colorOptions";
 import { formatCurrency } from "../utils/formatCurrency";
 
 const checkoutFieldClassName =
@@ -319,7 +320,18 @@ function CheckoutPage() {
         <div className="mt-5 space-y-4">
           {cart.items.map((item) => (
             <div key={item._id} className="flex items-center justify-between gap-3 rounded-[10px] bg-white p-3 text-sm">
-              <span className="text-slate-600">{item.name} x {item.quantity}</span>
+              <div className="text-slate-600">
+                <p>
+                  {item.name} x {item.quantity}
+                </p>
+                {item.color || item.size ? (
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">
+                    {[item.color ? getColorOptionLabel(item.color) : "", item.size]
+                      .filter(Boolean)
+                      .join(" / ")}
+                  </p>
+                ) : null}
+              </div>
               <span className="font-semibold text-slate-900">{formatCurrency(item.price * item.quantity)}</span>
             </div>
           ))}

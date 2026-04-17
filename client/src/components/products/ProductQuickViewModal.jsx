@@ -11,6 +11,7 @@ import {
   createProductReview,
   fetchProductDetails,
 } from "../../features/products/productSlice";
+import { getColorOptionLabel, parseColorOption } from "../../utils/colorOptions";
 import { formatCurrency } from "../../utils/formatCurrency";
 
 const ReviewStars = ({ rating, interactive = false, onChange = null, size = 16 }) => (
@@ -57,6 +58,9 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
   const { selectedProduct, detailLoading, reviewLoading } = useSelector((state) => state.products);
   const [quantity, setQuantity] = useState(1);
   const [activePanel, setActivePanel] = useState("details");
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [selectedColor, setSelectedColor] = useState("");
+  const [selectedSize, setSelectedSize] = useState("");
   const [reviewForm, setReviewForm] = useState({
     rating: 5,
     comment: "",
@@ -66,6 +70,9 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
     if (isOpen) {
       setQuantity(1);
       setActivePanel("details");
+      setCurrentImageIndex(0);
+      setSelectedColor(product.colors?.[0] || "");
+      setSelectedSize(product.sizes?.[0] || "");
       setReviewForm({
         rating: 5,
         comment: "",
@@ -75,6 +82,12 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
   }, [dispatch, isOpen, product._id]);
 
   const activeProduct = selectedProduct?._id === product._id ? selectedProduct : product;
+  const productImages = activeProduct.images?.length
+    ? activeProduct.images
+    : [{ url: "", publicId: "" }];
+  const activeImage = productImages[currentImageIndex]?.url || productImages[0]?.url || "";
+  const requiresColor = (activeProduct.colors?.length || 0) > 0;
+  const requiresSize = (activeProduct.sizes?.length || 0) > 0;
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -83,7 +96,24 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
       return;
     }
 
-    const result = await dispatch(addCartItem({ productId: product._id, quantity }));
+    if (requiresColor && !selectedColor) {
+      toast.error("Please choose a color.");
+      return;
+    }
+
+    if (requiresSize && !selectedSize) {
+      toast.error("Please choose a size.");
+      return;
+    }
+
+    const result = await dispatch(
+      addCartItem({
+        productId: product._id,
+        quantity,
+        color: selectedColor,
+        size: selectedSize,
+      })
+    );
 
     if (addCartItem.fulfilled.match(result)) {
       toast.success(
@@ -172,7 +202,7 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
                         contentClass="!h-full !w-full flex items-center justify-center"
                       >
                         <img
-                          src={activeProduct.images?.[0]?.url}
+                          src={activeImage}
                           alt={activeProduct.name}
                           className="mx-auto max-h-[360px] w-full object-contain"
                         />
@@ -182,6 +212,28 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
                 )}
               </TransformWrapper>
             </div>
+            {productImages.length > 1 ? (
+              <div className="mt-3 grid grid-cols-4 gap-3">
+                {productImages.map((image, index) => (
+                  <button
+                    key={`${image.publicId || image.url}-${index}`}
+                    type="button"
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={`overflow-hidden rounded-[10px] border p-1 transition ${
+                      index === currentImageIndex
+                        ? "border-violet-300 bg-violet-50"
+                        : "border-slate-200 bg-white hover:border-violet-200"
+                    }`}
+                  >
+                    <img
+                      src={image.url}
+                      alt={`${activeProduct.name} ${index + 1}`}
+                      className="h-16 w-full rounded-[8px] object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-5">
@@ -222,6 +274,68 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
             </p>
 
             <div className="space-y-4 rounded-[10px] border border-slate-200 bg-slate-50 p-4">
+              {requiresColor ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Color
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {activeProduct.colors.map((color) => (
+                      (() => {
+                        const parsedColor = parseColorOption(color);
+
+                        return (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setSelectedColor(color)}
+                        className={`rounded-[10px] border px-3 py-2 text-sm font-semibold transition ${
+                          selectedColor === color
+                            ? "border-violet-300 bg-violet-100 text-violet-800"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-violet-200"
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          {parsedColor.hex ? (
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-black/10"
+                              style={{ backgroundColor: parsedColor.hex }}
+                            />
+                          ) : null}
+                          {parsedColor.label}
+                        </span>
+                      </button>
+                        );
+                      })()
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {requiresSize ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Size
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {activeProduct.sizes.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setSelectedSize(size)}
+                        className={`rounded-[10px] border px-3 py-2 text-sm font-semibold transition ${
+                          selectedSize === size
+                            ? "border-violet-300 bg-violet-100 text-violet-800"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-violet-200"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
                   Quantity
@@ -328,6 +442,30 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
                     </p>
                   </div>
                 </div>
+                {(requiresColor || requiresSize) ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {requiresColor ? (
+                      <div className="rounded-[10px] border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                          Colors
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">
+                          {activeProduct.colors.map(getColorOptionLabel).join(", ")}
+                        </p>
+                      </div>
+                    ) : null}
+                    {requiresSize ? (
+                      <div className="rounded-[10px] border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                          Sizes
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">
+                          {activeProduct.sizes.join(", ")}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <div className="space-y-3">
                 <div className="rounded-[10px] border border-slate-200 bg-slate-50 p-4">

@@ -21,6 +21,8 @@ router.post(
   [
     body("productId").isMongoId().withMessage("A valid product id is required."),
     body("quantity").optional().isInt({ min: 1 }).withMessage("Quantity must be at least 1."),
+    body("color").optional().trim(),
+    body("size").optional().trim(),
   ],
   validateRequest,
   addToCart

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Menu, Transition } from "@headlessui/react";
 import {
   ChevronDown,
+  Heart,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -29,10 +30,12 @@ function Header() {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { cart } = useSelector((state) => state.cart);
+  const { items: wishlistItems } = useSelector((state) => state.wishlist);
   const [hasAvatarError, setHasAvatarError] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const cartCount = cart.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  const wishlistCount = wishlistItems.length || 0;
   const firstName = useMemo(() => user?.name?.trim().split(" ")[0] || "", [user?.name]);
   const avatarUrl = useMemo(() => {
     if (!user?.avatar) {
@@ -103,7 +106,24 @@ function Header() {
             <NavLink to="/shop" className={navLinkClassName}>
               Home
             </NavLink>
+            {user ? (
+              <NavLink to="/shop/wishlist" className={navLinkClassName}>
+                Wishlist
+              </NavLink>
+            ) : null}
           </nav>
+          {user ? (
+            <Link
+              to="/shop/wishlist"
+              className="relative inline-flex items-center gap-2 rounded-[10px] border border-white/18 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50"
+            >
+              <Heart size={17} />
+              <span className="hidden sm:inline">Wishlist</span>
+              <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-rose-500 px-2 py-0.5 text-xs font-bold text-white">
+                {wishlistCount}
+              </span>
+            </Link>
+          ) : null}
           <button
             type="button"
             onClick={() => dispatch(toggleCartDrawer())}
@@ -175,6 +195,20 @@ function Header() {
                         )}
                       </Menu.Item>
                     ) : null}
+
+                    <Menu.Item>
+                      {({ active }) => (
+                        <Link
+                          to="/shop/wishlist"
+                          className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium ${
+                            active ? "bg-violet-50 text-violet-700" : "text-slate-700"
+                          }`}
+                        >
+                          <Heart size={17} />
+                          Wishlist
+                        </Link>
+                      )}
+                    </Menu.Item>
 
                     <Menu.Item>
                       {({ active }) => (

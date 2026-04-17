@@ -6,6 +6,41 @@ const calculateCartTotals = (cart) => {
   cart.itemsPrice = cart.items.reduce((total, item) => total + item.price * item.quantity, 0);
 };
 
+const normalizeVariantValue = (value) => String(value || "").trim();
+
+const resolveSelectedVariant = ({ product, color, size }) => {
+  const selectedColor = normalizeVariantValue(color);
+  const selectedSize = normalizeVariantValue(size);
+
+  if (product.colors.length > 0 && !selectedColor) {
+    const error = new Error("Please choose a color.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (product.sizes.length > 0 && !selectedSize) {
+    const error = new Error("Please choose a size.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (selectedColor && !product.colors.includes(selectedColor)) {
+    const error = new Error("Selected color is not available for this product.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (selectedSize && !product.sizes.includes(selectedSize)) {
+    const error = new Error("Selected size is not available for this product.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return { selectedColor, selectedSize };
+};
+
+const resolveCartItemImage = (product) => product.images?.[0]?.url || "";
+
 const getOrCreateCart = async (userId) => {
   let cart = await Cart.findOne({ user: userId });
 
@@ -26,7 +61,7 @@ const getMyCart = asyncHandler(async (req, res) => {
 });
 
 const addToCart = asyncHandler(async (req, res) => {
-  const { productId, quantity } = req.body;
+  const { productId, quantity, color, size } = req.body;
   const product = await Product.findById(productId);
 
   if (!product || !product.isPublished) {
@@ -41,22 +76,33 @@ const addToCart = asyncHandler(async (req, res) => {
     throw new Error("Requested quantity is greater than available stock.");
   }
 
+  const { selectedColor, selectedSize } = resolveSelectedVariant({ product, color, size });
+
   const cart = await getOrCreateCart(req.user._id);
-  const existingItem = cart.items.find((item) => item.product.toString() === productId);
+  const existingItem = cart.items.find(
+    (item) =>
+      item.product.toString() === productId &&
+      normalizeVariantValue(item.color) === selectedColor &&
+      normalizeVariantValue(item.size) === selectedSize
+  );
 
   if (existingItem) {
     existingItem.quantity = Math.min(existingItem.quantity + safeQuantity, product.stock);
     existingItem.price = product.price;
     existingItem.stock = product.stock;
-    existingItem.image = product.images[0].url;
+    existingItem.image = resolveCartItemImage(product);
+    existingItem.color = selectedColor;
+    existingItem.size = selectedSize;
   } else {
     cart.items.push({
       product: product._id,
       name: product.name,
-      image: product.images[0].url,
+      image: resolveCartItemImage(product),
       price: product.price,
       quantity: safeQuantity,
       stock: product.stock,
+      color: selectedColor,
+      size: selectedSize,
     });
   }
 
@@ -95,6 +141,7 @@ const updateCartItem = asyncHandler(async (req, res) => {
   item.quantity = quantity;
   item.price = product.price;
   item.stock = product.stock;
+  item.image = resolveCartItemImage(product);
   calculateCartTotals(cart);
   await cart.save();
 

@@ -77,9 +77,17 @@ router.post(
     body("description").trim().notEmpty().withMessage("Product description is required."),
     body("category").trim().notEmpty().withMessage("Category is required."),
     body("price").isFloat({ min: 0 }).withMessage("Price must be 0 or greater."),
+    body("comparePrice")
+      .optional({ nullable: true })
+      .isFloat({ min: 0 })
+      .withMessage("Compare price must be 0 or greater."),
     body("stock").isInt({ min: 0 }).withMessage("Stock must be 0 or greater."),
     body("images").isArray({ min: 1 }).withMessage("At least one image is required."),
     body("images.*.url").notEmpty().withMessage("Each image must include a url."),
+    body("colors").optional().isArray().withMessage("Colors must be an array."),
+    body("colors.*").optional().trim().notEmpty().withMessage("Colors cannot be empty."),
+    body("sizes").optional().isArray().withMessage("Sizes must be an array."),
+    body("sizes.*").optional().trim().notEmpty().withMessage("Sizes cannot be empty."),
   ],
   validateRequest,
   createProduct
@@ -89,7 +97,24 @@ router.put(
   "/:id",
   protect,
   adminOnly,
-  [param("id").isMongoId().withMessage("A valid product id is required.")],
+  [
+    param("id").isMongoId().withMessage("A valid product id is required."),
+    body("price")
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage("Price must be 0 or greater."),
+    body("comparePrice")
+      .optional({ nullable: true })
+      .isFloat({ min: 0 })
+      .withMessage("Compare price must be 0 or greater."),
+    body("stock").optional().isInt({ min: 0 }).withMessage("Stock must be 0 or greater."),
+    body("images").optional().isArray({ min: 1 }).withMessage("At least one image is required."),
+    body("images.*.url").optional().notEmpty().withMessage("Each image must include a url."),
+    body("colors").optional().isArray().withMessage("Colors must be an array."),
+    body("colors.*").optional().trim().notEmpty().withMessage("Colors cannot be empty."),
+    body("sizes").optional().isArray().withMessage("Sizes must be an array."),
+    body("sizes.*").optional().trim().notEmpty().withMessage("Sizes cannot be empty."),
+  ],
   validateRequest,
   updateProduct
 );

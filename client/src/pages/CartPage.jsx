@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { clearCart, removeCartItem, updateCartItem } from "../features/cart/cartSlice";
+import { getColorOptionLabel } from "../utils/colorOptions";
 import { formatCurrency } from "../utils/formatCurrency";
 
 function CartPage() {
@@ -52,6 +53,13 @@ function CartPage() {
                     <p className="text-sm text-slate-500">
                       {formatCurrency(item.price)} each
                     </p>
+                    {item.color || item.size ? (
+                      <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">
+                        {[item.color ? getColorOptionLabel(item.color) : "", item.size]
+                          .filter(Boolean)
+                          .join(" / ")}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex items-center gap-3">

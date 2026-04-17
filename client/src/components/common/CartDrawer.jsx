@@ -10,6 +10,7 @@ import {
   removeCartItem,
   updateCartItem,
 } from "../../features/cart/cartSlice";
+import { getColorOptionLabel } from "../../utils/colorOptions";
 import { formatCurrency } from "../../utils/formatCurrency";
 
 function CartDrawer() {
@@ -111,6 +112,13 @@ function CartDrawer() {
                                   <p className="text-sm text-slate-500">
                                     {formatCurrency(item.price)}
                                   </p>
+                                  {item.color || item.size ? (
+                                    <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                                      {[item.color ? getColorOptionLabel(item.color) : "", item.size]
+                                        .filter(Boolean)
+                                        .join(" / ")}
+                                    </p>
+                                  ) : null}
                                 </div>
 
                                 <div className="flex items-center justify-between gap-3">

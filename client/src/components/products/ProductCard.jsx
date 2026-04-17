@@ -1,10 +1,11 @@
-import { Eye, ShoppingCart } from "lucide-react";
+import { Eye, Heart, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { addCartItem, openCartDrawer } from "../../features/cart/cartSlice";
+import { addWishlistItem, removeWishlistItem } from "../../features/wishlist/wishlistSlice";
 import { formatCurrency } from "../../utils/formatCurrency";
 import ProductQuickViewModal from "./ProductQuickViewModal";
 
@@ -13,7 +14,13 @@ function ProductCard({ product }) {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
   const { isLoading } = useSelector((state) => state.cart);
+  const { items: wishlistItems, isLoading: isWishlistLoading } = useSelector(
+    (state) => state.wishlist
+  );
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const requiresVariantSelection =
+    (product.colors?.length || 0) > 0 || (product.sizes?.length || 0) > 0;
+  const isWishlisted = wishlistItems.some((item) => item._id === product._id);
 
   const handleAddToCart = async (event) => {
     if (event) {
@@ -25,6 +32,11 @@ function ProductCard({ product }) {
       return;
     }
 
+    if (requiresVariantSelection) {
+      setIsQuickViewOpen(true);
+      return;
+    }
+
     const result = await dispatch(addCartItem({ productId: product._id, quantity: 1 }));
 
     if (addCartItem.fulfilled.match(result)) {
@@ -32,6 +44,25 @@ function ProductCard({ product }) {
       dispatch(openCartDrawer());
     } else if (addCartItem.rejected.match(result)) {
       toast.error(result.payload || "Failed to add item to cart.");
+    }
+  };
+
+  const handleWishlistToggle = async (event) => {
+    event.stopPropagation();
+
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    const result = isWishlisted
+      ? await dispatch(removeWishlistItem(product._id))
+      : await dispatch(addWishlistItem(product._id));
+
+    if (addWishlistItem.fulfilled.match(result) || removeWishlistItem.fulfilled.match(result)) {
+      toast.success(isWishlisted ? "Removed from wishlist." : "Saved to wishlist.");
+    } else {
+      toast.error(result.payload || "Failed to update wishlist.");
     }
   };
 
@@ -57,6 +88,19 @@ function ProductCard({ product }) {
         >
           <Eye size={14} />
           Quick View
+        </button>
+        <button
+          type="button"
+          onClick={handleWishlistToggle}
+          disabled={isWishlistLoading && !isWishlisted}
+          className={`absolute left-4 top-4 inline-flex items-center justify-center rounded-full border px-3 py-3 shadow-sm backdrop-blur transition ${
+            isWishlisted
+              ? "border-rose-200 bg-rose-50 text-rose-500"
+              : "border-white/70 bg-white/90 text-slate-600 hover:bg-white"
+          }`}
+          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          <Heart size={16} className={isWishlisted ? "fill-current" : ""} />
         </button>
       </div>
 
@@ -85,6 +129,11 @@ function ProductCard({ product }) {
             {product.comparePrice > product.price ? (
               <p className="text-sm text-slate-400 line-through">
                 {formatCurrency(product.comparePrice)}
+              </p>
+            ) : null}
+            {requiresVariantSelection ? (
+              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-violet-500">
+                Choose options
               </p>
             ) : null}
           </div>

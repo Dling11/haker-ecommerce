@@ -24,6 +24,13 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
+const variantValueSchema = {
+  type: [String],
+  default: [],
+  set: (values) =>
+    [...new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))],
+};
+
 const productSchema = new mongoose.Schema(
   {
     name: {
@@ -77,6 +84,8 @@ const productSchema = new mongoose.Schema(
         message: "At least one product image is required",
       },
     },
+    colors: variantValueSchema,
+    sizes: variantValueSchema,
     reviews: {
       type: [reviewSchema],
       default: [],

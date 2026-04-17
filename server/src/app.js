@@ -13,6 +13,7 @@ const userRoutes = require("./routes/userRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
+const wishlistRoutes = require("./routes/wishlistRoutes");
 const notFound = require("./middleware/notFound");
 const errorMiddleware = require("./middleware/errorMiddleware");
 
@@ -64,6 +65,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/wishlist", wishlistRoutes);
 
 app.use(notFound);
 app.use(errorMiddleware);
