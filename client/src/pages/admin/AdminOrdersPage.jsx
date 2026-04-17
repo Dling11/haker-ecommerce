@@ -36,6 +36,8 @@ const paymentMethods = ["cod", "gcash"];
 const createEmptyOrderItem = () => ({
   productId: "",
   quantity: 1,
+  color: "",
+  size: "",
 });
 
 const initialFormState = {
@@ -114,8 +116,10 @@ function AdminOrdersPage() {
     setFormData({
       userId: order.user?._id || "",
       orderItems: order.orderItems.map((item) => ({
-        productId: item.product,
+        productId: item.product?._id || item.product,
         quantity: item.quantity,
+        color: item.color || "",
+        size: item.size || "",
       })),
       fullName: order.shippingAddress?.fullName || "",
       phone: order.shippingAddress?.phone || "",
@@ -206,6 +210,10 @@ function AdminOrdersPage() {
           updateAdminOrder({
             orderId: editingOrder._id,
             ...payload,
+            orderItems: formData.orderItems.map((item) => ({
+              color: item.color || "",
+              size: item.size || "",
+            })),
           })
         )
       : await dispatch(
@@ -214,6 +222,8 @@ function AdminOrdersPage() {
             orderItems: formData.orderItems.map((item) => ({
               productId: item.productId,
               quantity: Number(item.quantity),
+              color: item.color || "",
+              size: item.size || "",
             })),
           })
         );
@@ -339,25 +349,26 @@ function AdminOrdersPage() {
         id: "actions",
         header: "Actions",
         cell: ({ row }) => (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 whitespace-nowrap">
             <button
               type="button"
               onClick={() => setViewOrder(row.original)}
-              className="btn-secondary px-4 py-2"
+              className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-cyan-200 transition hover:bg-cyan-500/15"
             >
               <Eye size={16} />
+              View
             </button>
             <button
               type="button"
               onClick={() => startEditing(row.original)}
-              className="btn-secondary px-4 py-2"
+              className="btn-secondary h-9 px-3 py-2"
             >
               <PencilLine size={16} />
             </button>
             <button
               type="button"
               onClick={() => setPendingDeleteOrder(row.original)}
-              className="rounded-[10px] border border-rose-500/20 px-4 py-2 text-rose-300 transition hover:bg-rose-500/10"
+              className="h-9 rounded-[10px] border border-rose-500/20 px-3 py-2 text-rose-300 transition hover:bg-rose-500/10"
             >
               <Trash2 size={16} />
             </button>
@@ -537,50 +548,175 @@ function AdminOrdersPage() {
                   </button>
                 </div>
 
-                {formData.orderItems.map((item, index) => (
-                  <div key={`order-item-${index}`} className="grid gap-3 rounded-[10px] border border-white/10 p-3 md:grid-cols-[1fr_140px_auto]">
-                    <SearchableSelect
-                      label={`Product ${index + 1}`}
-                      placeholder="Search product by name or category"
-                      options={productOptions}
-                      value={item.productId}
-                      onChange={(value) => handleOrderItemChange(index, { productId: value })}
-                      emptyMessage="No matching products found."
-                    />
+                {formData.orderItems.map((item, index) => {
+                  const selectedProduct = adminItems.find(
+                    (product) => product._id === item.productId
+                  );
 
-                    <label className="block space-y-2">
-                      <span className="text-sm font-semibold text-white/80">Quantity</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(event) =>
+                  return (
+                    <div
+                      key={`order-item-${index}`}
+                      className="grid gap-3 rounded-[10px] border border-white/10 p-3 md:grid-cols-[1fr_140px_1fr_1fr_auto]"
+                    >
+                      <SearchableSelect
+                        label={`Product ${index + 1}`}
+                        placeholder="Search product by name or category"
+                        options={productOptions}
+                        value={item.productId}
+                        onChange={(value) =>
                           handleOrderItemChange(index, {
-                            quantity: Number(event.target.value),
+                            productId: value,
+                            color: "",
+                            size: "",
                           })
                         }
-                        className="field"
-                        required
+                        emptyMessage="No matching products found."
                       />
-                    </label>
 
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={() => removeOrderItemRow(index)}
-                        disabled={formData.orderItems.length === 1}
-                        className="rounded-[10px] border border-rose-500/20 px-4 py-3 text-rose-300 disabled:cursor-not-allowed disabled:text-white/25"
-                      >
-                        Remove
-                      </button>
+                      <label className="block space-y-2">
+                        <span className="text-sm font-semibold text-white/80">Quantity</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(event) =>
+                            handleOrderItemChange(index, {
+                              quantity: Number(event.target.value),
+                            })
+                          }
+                          className="field"
+                          required
+                        />
+                      </label>
+
+                      <label className="block space-y-2">
+                        <span className="text-sm font-semibold text-white/80">Color</span>
+                        <select
+                          value={item.color}
+                          onChange={(event) =>
+                            handleOrderItemChange(index, { color: event.target.value })
+                          }
+                          className="field"
+                          disabled={!selectedProduct?.colors?.length}
+                        >
+                          <option value="">No color</option>
+                          {selectedProduct?.colors?.map((color) => (
+                            <option key={color} value={color}>
+                              {color}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="block space-y-2">
+                        <span className="text-sm font-semibold text-white/80">Size</span>
+                        <select
+                          value={item.size}
+                          onChange={(event) =>
+                            handleOrderItemChange(index, { size: event.target.value })
+                          }
+                          className="field"
+                          disabled={!selectedProduct?.sizes?.length}
+                        >
+                          <option value="">No size</option>
+                          {selectedProduct?.sizes?.map((size) => (
+                            <option key={size} value={size}>
+                              {size}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          onClick={() => removeOrderItemRow(index)}
+                          disabled={formData.orderItems.length === 1}
+                          className="rounded-[10px] border border-rose-500/20 px-4 py-3 text-rose-300 disabled:cursor-not-allowed disabled:text-white/25"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           ) : (
-            <div className="panel-muted p-4 text-sm text-white/70">
-              Line items are kept stable during admin edits. For different products, create a new order.
+            <div className="space-y-3 rounded-[10px] border border-white/10 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-white/80">Order items</p>
+                <p className="text-xs text-white/45">
+                  Product and quantity stay fixed. Variants can still be updated.
+                </p>
+              </div>
+
+              {formData.orderItems.map((item, index) => {
+                const selectedProduct = adminItems.find(
+                  (product) => product._id === item.productId
+                );
+                const productName =
+                  selectedProduct?.name || editingOrder?.orderItems?.[index]?.name || "Product";
+
+                return (
+                  <div
+                    key={`edit-order-item-${index}`}
+                    className="grid gap-3 rounded-[10px] border border-white/10 p-3 md:grid-cols-[1.2fr_140px_1fr_1fr]"
+                  >
+                    <div className="space-y-2">
+                      <span className="text-sm font-semibold text-white/80">Product</span>
+                      <div className="field flex items-center bg-white/5 text-white/75">
+                        {productName}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-sm font-semibold text-white/80">Quantity</span>
+                      <div className="field flex items-center bg-white/5 text-white/75">
+                        {item.quantity}
+                      </div>
+                    </div>
+
+                    <label className="block space-y-2">
+                      <span className="text-sm font-semibold text-white/80">Color</span>
+                      <select
+                        value={item.color}
+                        onChange={(event) =>
+                          handleOrderItemChange(index, { color: event.target.value })
+                        }
+                        className="field"
+                        disabled={!selectedProduct?.colors?.length}
+                      >
+                        <option value="">No color</option>
+                        {selectedProduct?.colors?.map((color) => (
+                          <option key={color} value={color}>
+                            {color}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="block space-y-2">
+                      <span className="text-sm font-semibold text-white/80">Size</span>
+                      <select
+                        value={item.size}
+                        onChange={(event) =>
+                          handleOrderItemChange(index, { size: event.target.value })
+                        }
+                        className="field"
+                        disabled={!selectedProduct?.sizes?.length}
+                      >
+                        <option value="">No size</option>
+                        {selectedProduct?.sizes?.map((size) => (
+                          <option key={size} value={size}>
+                            {size}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -696,7 +832,7 @@ function AdminOrdersPage() {
         onClose={() => setViewOrder(null)}
         title={viewOrder ? `Order #${viewOrder._id.slice(-6).toUpperCase()}` : "Order details"}
         description="Review payment, shipping, and line-item details."
-        width="max-w-3xl"
+        width="max-w-4xl"
       >
         {viewOrder ? (
           <div className="space-y-4 text-sm text-white/80">
@@ -733,16 +869,45 @@ function AdminOrdersPage() {
             </div>
 
             <div className="panel-muted p-4">
-              <p className="text-xs uppercase tracking-[0.2em] text-white/40">Items</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-white/40">Items</p>
+                <span className="text-xs text-white/40">
+                  {viewOrder.orderItems.length} line item{viewOrder.orderItems.length > 1 ? "s" : ""}
+                </span>
+              </div>
               <div className="mt-3 space-y-3">
                 {viewOrder.orderItems.map((item) => (
-                  <div key={`${item.product}-${item.name}`} className="flex items-center gap-3">
-                    <img src={item.image} alt={item.name} className="h-14 w-14 rounded-[10px] object-cover" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-white">{item.name}</p>
+                  <div
+                    key={`${item.product}-${item.name}-${item.color}-${item.size}`}
+                    className="flex items-center gap-4 rounded-[14px] border border-white/10 bg-white/5 p-3"
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="h-16 w-16 rounded-[12px] object-cover"
+                    />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-white">{item.name}</p>
+                        <p className="text-sm font-semibold text-white">
+                          {formatCurrency(item.price * item.quantity)}
+                        </p>
+                      </div>
                       <p className="text-white/50">
                         {item.quantity} x {formatCurrency(item.price)}
                       </p>
+                      <div className="flex flex-wrap gap-2">
+                        {item.color ? (
+                          <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+                            Color: {item.color}
+                          </span>
+                        ) : null}
+                        {item.size ? (
+                          <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-xs font-semibold text-violet-200">
+                            Size: {item.size}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -6,8 +6,8 @@ function PaginationControls({ pagination, onPageChange }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-[10px] border border-white/10 bg-surface-panel/90 px-4 py-4 text-sm text-white/70 sm:flex-row sm:items-center sm:justify-between">
-      <p>
+    <div className="flex flex-col gap-3 rounded-[10px] border border-violet-100 bg-white px-4 py-4 text-sm text-slate-600 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+      <p className="font-medium text-slate-600">
         Page {pagination.page} of {pagination.totalPages}
       </p>
 
@@ -16,7 +16,7 @@ function PaginationControls({ pagination, onPageChange }) {
           type="button"
           onClick={() => onPageChange(pagination.page - 1)}
           disabled={pagination.page <= 1}
-          className="inline-flex items-center gap-2 rounded-[10px] border border-white/10 px-4 py-2 disabled:cursor-not-allowed disabled:text-white/30"
+          className="inline-flex items-center gap-2 rounded-[10px] border border-violet-100 bg-white px-4 py-2 font-medium text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
         >
           <ChevronLeft size={16} />
           Previous
@@ -25,7 +25,7 @@ function PaginationControls({ pagination, onPageChange }) {
           type="button"
           onClick={() => onPageChange(pagination.page + 1)}
           disabled={pagination.page >= pagination.totalPages}
-          className="inline-flex items-center gap-2 rounded-[10px] border border-white/10 px-4 py-2 disabled:cursor-not-allowed disabled:text-white/30"
+          className="inline-flex items-center gap-2 rounded-[10px] border border-violet-100 bg-white px-4 py-2 font-medium text-violet-700 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
         >
           Next
           <ChevronRight size={16} />

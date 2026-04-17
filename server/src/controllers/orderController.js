@@ -665,6 +665,7 @@ const updateAdminOrder = asyncHandler(async (req, res) => {
     orderStatus,
     gcashReference,
     notes,
+    orderItems,
   } = req.body;
   const previousOrderStatus = order.orderStatus;
 
@@ -704,6 +705,22 @@ const updateAdminOrder = asyncHandler(async (req, res) => {
 
   if (notes !== undefined) {
     order.notes = notes;
+  }
+
+  if (Array.isArray(orderItems) && orderItems.length) {
+    order.orderItems = order.orderItems.map((item, index) => {
+      const incomingItem = orderItems[index];
+
+      if (!incomingItem) {
+        return item;
+      }
+
+      return {
+        ...item.toObject(),
+        color: incomingItem.color || "",
+        size: incomingItem.size || "",
+      };
+    });
   }
 
   await order.save();

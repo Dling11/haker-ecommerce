@@ -11,20 +11,12 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, NavLink } from "react-router-dom";
+import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { logoutUser } from "../../features/auth/authSlice";
 import { toggleCartDrawer } from "../../features/cart/cartSlice";
 import getPostLoginPath from "../../utils/getPostLoginPath";
-
-const navLinkClassName = ({ isActive }) =>
-  [
-    "rounded-[10px] px-4 py-2 text-sm font-semibold transition",
-    isActive
-      ? "bg-white text-violet-700 shadow-sm"
-      : "text-white/85 hover:bg-white/12 hover:text-white",
-  ].join(" ");
 
 function Header() {
   const dispatch = useDispatch();
@@ -102,24 +94,14 @@ function Header() {
         </div>
 
         <div className="flex items-center gap-3">
-          <nav className="hidden items-center gap-2 md:flex">
-            <NavLink to="/shop" className={navLinkClassName}>
-              Home
-            </NavLink>
-            {user ? (
-              <NavLink to="/shop/wishlist" className={navLinkClassName}>
-                Wishlist
-              </NavLink>
-            ) : null}
-          </nav>
           {user ? (
             <Link
               to="/shop/wishlist"
-              className="relative inline-flex items-center gap-2 rounded-[10px] border border-white/18 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50"
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-white/18 bg-white text-violet-700 shadow-sm transition hover:bg-violet-50"
+              aria-label="Wishlist"
             >
               <Heart size={17} />
-              <span className="hidden sm:inline">Wishlist</span>
-              <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-rose-500 px-2 py-0.5 text-xs font-bold text-white">
+              <span className="absolute -right-2 -top-2 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {wishlistCount}
               </span>
             </Link>

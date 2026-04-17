@@ -1,4 +1,4 @@
-import { Minus, Plus, ShoppingCart, Star } from "lucide-react";
+import { Heart, Minus, Plus, ShoppingCart, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +7,7 @@ import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 
 import AppModal from "../common/AppModal";
 import { addCartItem, openCartDrawer } from "../../features/cart/cartSlice";
+import { addWishlistItem, removeWishlistItem } from "../../features/wishlist/wishlistSlice";
 import {
   createProductReview,
   fetchProductDetails,
@@ -55,6 +56,9 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
   const { user } = useSelector((state) => state.auth);
   const { settings } = useSelector((state) => state.site);
   const { isLoading } = useSelector((state) => state.cart);
+  const { items: wishlistItems, isLoading: isWishlistLoading } = useSelector(
+    (state) => state.wishlist
+  );
   const { selectedProduct, detailLoading, reviewLoading } = useSelector((state) => state.products);
   const [quantity, setQuantity] = useState(1);
   const [activePanel, setActivePanel] = useState("details");
@@ -88,6 +92,7 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
   const activeImage = productImages[currentImageIndex]?.url || productImages[0]?.url || "";
   const requiresColor = (activeProduct.colors?.length || 0) > 0;
   const requiresSize = (activeProduct.sizes?.length || 0) > 0;
+  const isWishlisted = wishlistItems.some((item) => item._id === product._id);
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -123,6 +128,24 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
       dispatch(openCartDrawer());
     } else {
       toast.error(result.payload || "Failed to add item to cart.");
+    }
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!user) {
+      onClose();
+      navigate("/login");
+      return;
+    }
+
+    const result = isWishlisted
+      ? await dispatch(removeWishlistItem(product._id))
+      : await dispatch(addWishlistItem(product._id));
+
+    if (addWishlistItem.fulfilled.match(result) || removeWishlistItem.fulfilled.match(result)) {
+      toast.success(isWishlisted ? "Removed from wishlist." : "Saved to wishlist.");
+    } else {
+      toast.error(result.payload || "Failed to update wishlist.");
     }
   };
 
@@ -366,6 +389,19 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
               </div>
 
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleWishlistToggle}
+                  disabled={isWishlistLoading && !isWishlisted}
+                  className={`inline-flex h-12 w-12 items-center justify-center rounded-[10px] border transition ${
+                    isWishlisted
+                      ? "border-rose-200 bg-rose-50 text-rose-500"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:text-rose-500"
+                  }`}
+                  aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                  <Heart size={18} className={isWishlisted ? "fill-current" : ""} />
+                </button>
                 <button
                   type="button"
                   onClick={handleAddToCart}
