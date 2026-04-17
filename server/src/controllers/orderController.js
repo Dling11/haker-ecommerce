@@ -2,6 +2,8 @@ const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Product = require("../models/Product");
 const User = require("../models/User");
+const Coupon = require("../models/Coupon");
+const { resolveCouponByCode } = require("./couponController");
 const asyncHandler = require("../utils/asyncHandler");
 const { getSiteSettings } = require("../utils/siteSettings");
 const {
@@ -16,6 +18,43 @@ const { sendOrderStatusSms } = require("../services/smsService");
 const { createAdminNotification } = require("../services/notificationService");
 
 const userCancellableStatuses = ["pending", "need_payment"];
+
+const restoreOrderUserPoints = async (order) => {
+  const pointUpdate = {};
+
+  if (order.pointsRedeemed > 0) {
+    pointUpdate.loyaltyPoints = order.pointsRedeemed;
+  }
+
+  if (order.pointsGranted && order.pointsEarned > 0) {
+    pointUpdate.loyaltyPoints = (pointUpdate.loyaltyPoints || 0) - order.pointsEarned;
+  }
+
+  if (!Object.keys(pointUpdate).length) {
+    return;
+  }
+
+  await User.findByIdAndUpdate(order.user, {
+    $inc: pointUpdate,
+  });
+
+  order.pointsGranted = false;
+};
+
+const grantOrderPointsIfEligible = async (order) => {
+  if (order.pointsGranted || order.pointsEarned <= 0 || order.orderStatus !== "delivered") {
+    return;
+  }
+
+  await User.findByIdAndUpdate(order.user, {
+    $inc: {
+      loyaltyPoints: order.pointsEarned,
+      lifetimePoints: order.pointsEarned,
+    },
+  });
+
+  order.pointsGranted = true;
+};
 
 const restoreOrderStock = async (order) => {
   await Promise.all(
@@ -167,7 +206,7 @@ const enrichOrdersWithAvailability = async (orders) => {
 };
 
 const createOrder = asyncHandler(async (req, res) => {
-  const { shippingAddress, paymentMethod, notes } = req.body;
+  const { shippingAddress, paymentMethod, notes, couponCode = "", pointsToRedeem = 0 } = req.body;
   const settings = await getSiteSettings();
   const cart = await Cart.findOne({ user: req.user._id });
 
@@ -200,7 +239,60 @@ const createOrder = asyncHandler(async (req, res) => {
     }
   }
 
-  const { itemsPrice, shippingPrice, taxPrice, totalPrice } = calculateTotals(cart.items);
+  const { itemsPrice } = calculateTotals(cart.items);
+  let couponDiscount = 0;
+  let normalizedCouponCode = "";
+
+  if (couponCode) {
+    if (!settings.allowCoupons) {
+      res.status(403);
+      throw new Error("Coupons are currently disabled.");
+    }
+
+    const couponResult = await resolveCouponByCode(couponCode, itemsPrice);
+    couponDiscount = couponResult.discount;
+    normalizedCouponCode = couponResult.coupon.code;
+  }
+
+  let pointsRedeemed = 0;
+  let pointsDiscount = 0;
+
+  if (Number(pointsToRedeem) > 0) {
+    if (!settings.allowPoints) {
+      res.status(403);
+      throw new Error("Points redemption is currently disabled.");
+    }
+
+    if (req.user.loyaltyPoints < Number(pointsToRedeem)) {
+      res.status(400);
+      throw new Error("You do not have enough points.");
+    }
+
+    const pointValue = Number(settings.pointRedemptionValue || 1);
+    const maxRedeemablePoints =
+      pointValue > 0 ? Math.floor(Math.max(itemsPrice - couponDiscount, 0) / pointValue) : 0;
+
+    pointsRedeemed = Math.min(
+      Math.floor(Number(pointsToRedeem)),
+      req.user.loyaltyPoints,
+      maxRedeemablePoints
+    );
+    pointsDiscount = Math.min(
+      Number((pointsRedeemed * pointValue).toFixed(2)),
+      Math.max(itemsPrice - couponDiscount, 0)
+    );
+  }
+
+  const discountedItemsPrice = Number(
+    Math.max(itemsPrice - couponDiscount - pointsDiscount, 0).toFixed(2)
+  );
+  const shippingPrice = discountedItemsPrice >= 3000 ? 0 : 150;
+  const taxPrice = Number((discountedItemsPrice * 0.02).toFixed(2));
+  const totalPrice = Number((discountedItemsPrice + shippingPrice + taxPrice).toFixed(2));
+  const pointsEarned =
+    settings.allowPoints && settings.pointsEarnRate > 0
+      ? Math.floor(discountedItemsPrice / 100) * Number(settings.pointsEarnRate || 0)
+      : 0;
 
   const order = await Order.create({
     user: req.user._id,
@@ -220,11 +312,22 @@ const createOrder = asyncHandler(async (req, res) => {
     orderStatus: paymentMethod === "gcash" ? "need_payment" : "pending",
     gcashReference: "",
     notes: notes || "",
-    itemsPrice,
+    couponCode: normalizedCouponCode,
+    couponDiscount,
+    pointsRedeemed,
+    pointsDiscount,
+    pointsEarned,
+    itemsPrice: discountedItemsPrice,
     shippingPrice,
     taxPrice,
     totalPrice,
   });
+
+  if (pointsRedeemed > 0) {
+    await User.findByIdAndUpdate(req.user._id, {
+      $inc: { loyaltyPoints: -pointsRedeemed },
+    });
+  }
 
   await decrementOrderStock(cart.items);
 
@@ -237,6 +340,12 @@ const createOrder = asyncHandler(async (req, res) => {
 
       order.paymongoCheckoutSessionId = checkoutSessionId || "";
       await order.save();
+      if (normalizedCouponCode) {
+        await Coupon.findOneAndUpdate(
+          { code: normalizedCouponCode },
+          { $inc: { usedCount: 1 } }
+        );
+      }
       await clearUserCart(req.user._id);
       await createAdminNotification({
         type: "order_placed",
@@ -264,6 +373,12 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 
   await clearUserCart(req.user._id);
+  if (normalizedCouponCode) {
+    await Coupon.findOneAndUpdate(
+      { code: normalizedCouponCode },
+      { $inc: { usedCount: 1 } }
+    );
+  }
   await createAdminNotification({
     type: "order_placed",
     title: `Order #${order._id.toString().slice(-6).toUpperCase()} placed`,
@@ -636,7 +751,10 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
 
   if (previousOrderStatus !== "cancelled" && order.orderStatus === "cancelled") {
     await restoreOrderStock(order);
+    await restoreOrderUserPoints(order);
   }
+
+  await grantOrderPointsIfEligible(order);
 
   await order.save();
   const user = await User.findById(order.user).select("-password");
@@ -697,6 +815,7 @@ const updateAdminOrder = asyncHandler(async (req, res) => {
 
   if (previousOrderStatus !== "cancelled" && order.orderStatus === "cancelled") {
     await restoreOrderStock(order);
+    await restoreOrderUserPoints(order);
   }
 
   if (gcashReference !== undefined) {
@@ -723,6 +842,8 @@ const updateAdminOrder = asyncHandler(async (req, res) => {
     });
   }
 
+  await grantOrderPointsIfEligible(order);
+
   await order.save();
   const emailUser = await resolveOrderEmailUser(order.user);
   await sendOrderStatusEmailIfEligible({ order, user: emailUser });
@@ -744,6 +865,7 @@ const deleteAdminOrder = asyncHandler(async (req, res) => {
   }
 
   await restoreOrderStock(order);
+  await restoreOrderUserPoints(order);
 
   await order.deleteOne();
 
@@ -773,6 +895,7 @@ const cancelMyOrder = asyncHandler(async (req, res) => {
 
   order.orderStatus = "cancelled";
   await restoreOrderStock(order);
+  await restoreOrderUserPoints(order);
   await order.save();
   await sendOrderStatusEmailIfEligible({ order, user: req.user });
   await sendOrderStatusSmsIfEligible({ order, user: req.user });

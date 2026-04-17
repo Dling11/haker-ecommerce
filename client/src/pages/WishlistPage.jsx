@@ -6,6 +6,7 @@ import ProductCard from "../components/products/ProductCard";
 
 function WishlistPage() {
   const { items, isLoading, error } = useSelector((state) => state.wishlist);
+  const { settings } = useSelector((state) => state.site);
 
   return (
     <section className="space-y-6">
@@ -21,8 +22,15 @@ function WishlistPage() {
       </div>
 
       <StatusMessage type="error" message={error} />
+      {settings?.allowWishlist === false ? (
+        <StatusMessage type="info" message="Wishlist is currently disabled by the store." />
+      ) : null}
 
-      {isLoading ? (
+      {settings?.allowWishlist === false ? (
+        <div className="rounded-[10px] border border-violet-100 bg-white p-8 text-slate-500 shadow-soft">
+          Wishlist access is paused right now.
+        </div>
+      ) : isLoading ? (
         <div className="rounded-[10px] border border-violet-100 bg-white p-8 text-slate-500 shadow-soft">
           Loading wishlist...
         </div>

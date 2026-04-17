@@ -14,6 +14,7 @@ function ProductCard({ product }) {
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
   const { isLoading } = useSelector((state) => state.cart);
+  const { settings } = useSelector((state) => state.site);
   const { items: wishlistItems, isLoading: isWishlistLoading } = useSelector(
     (state) => state.wishlist
   );
@@ -89,19 +90,21 @@ function ProductCard({ product }) {
           <Eye size={14} />
           Quick View
         </button>
-        <button
-          type="button"
-          onClick={handleWishlistToggle}
-          disabled={isWishlistLoading && !isWishlisted}
-          className={`absolute left-4 top-4 inline-flex items-center justify-center rounded-full border px-3 py-3 shadow-sm backdrop-blur transition ${
-            isWishlisted
-              ? "border-rose-200 bg-rose-50 text-rose-500"
-              : "border-white/70 bg-white/90 text-slate-600 hover:bg-white"
-          }`}
-          aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-        >
-          <Heart size={16} className={isWishlisted ? "fill-current" : ""} />
-        </button>
+        {settings?.allowWishlist !== false ? (
+          <button
+            type="button"
+            onClick={handleWishlistToggle}
+            disabled={isWishlistLoading && !isWishlisted}
+            className={`absolute left-4 top-4 inline-flex items-center justify-center rounded-full border px-3 py-3 shadow-sm backdrop-blur transition ${
+              isWishlisted
+                ? "border-rose-200 bg-rose-50 text-rose-500"
+                : "border-white/70 bg-white/90 text-slate-600 hover:bg-white"
+            }`}
+            aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          >
+            <Heart size={16} className={isWishlisted ? "fill-current" : ""} />
+          </button>
+        ) : null}
       </div>
 
       <div className="space-y-4 p-5">

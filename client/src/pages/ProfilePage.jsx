@@ -173,6 +173,21 @@ function ProfilePage() {
         <StatusMessage type="error" message={error} />
         <StatusMessage type="success" message={successMessage} />
 
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-[10px] border border-violet-100 bg-[linear-gradient(180deg,#faf7ff_0%,#ffffff_100%)] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
+              Loyalty points
+            </p>
+            <p className="mt-3 text-3xl font-black text-slate-900">{user?.loyaltyPoints || 0}</p>
+          </div>
+          <div className="rounded-[10px] border border-violet-100 bg-[linear-gradient(180deg,#faf7ff_0%,#ffffff_100%)] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
+              Lifetime points
+            </p>
+            <p className="mt-3 text-3xl font-black text-slate-900">{user?.lifetimePoints || 0}</p>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-4 rounded-[10px] border border-violet-100 bg-[linear-gradient(180deg,#faf7ff_0%,#ffffff_100%)] p-4 sm:flex-row sm:items-center">
           <div className="relative h-24 w-24 overflow-hidden rounded-full bg-slate-100">
             {formData.avatar ? (

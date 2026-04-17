@@ -48,6 +48,36 @@ const siteSettingsSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    allowWishlist: {
+      type: Boolean,
+      default: true,
+    },
+    allowCoupons: {
+      type: Boolean,
+      default: true,
+    },
+    allowPoints: {
+      type: Boolean,
+      default: true,
+    },
+    allowCollections: {
+      type: Boolean,
+      default: true,
+    },
+    allowHomepageBanners: {
+      type: Boolean,
+      default: true,
+    },
+    pointsEarnRate: {
+      type: Number,
+      default: 1,
+      min: 0,
+    },
+    pointRedemptionValue: {
+      type: Number,
+      default: 1,
+      min: 0,
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

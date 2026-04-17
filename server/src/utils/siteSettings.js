@@ -12,6 +12,13 @@ const defaultSettings = {
   allowCashOnDelivery: true,
   allowGCash: true,
   allowReviews: true,
+  allowWishlist: true,
+  allowCoupons: true,
+  allowPoints: true,
+  allowCollections: true,
+  allowHomepageBanners: true,
+  pointsEarnRate: 1,
+  pointRedemptionValue: 1,
 };
 
 const getSiteSettings = async () => {
@@ -50,6 +57,13 @@ const buildPublicSiteSettings = (settings) => ({
   allowCashOnDelivery: settings.allowCashOnDelivery,
   allowGCash: settings.allowGCash,
   allowReviews: settings.allowReviews,
+  allowWishlist: settings.allowWishlist,
+  allowCoupons: settings.allowCoupons,
+  allowPoints: settings.allowPoints,
+  allowCollections: settings.allowCollections,
+  allowHomepageBanners: settings.allowHomepageBanners,
+  pointsEarnRate: settings.pointsEarnRate,
+  pointRedemptionValue: settings.pointRedemptionValue,
 });
 
 module.exports = {

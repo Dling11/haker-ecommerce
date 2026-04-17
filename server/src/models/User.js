@@ -97,6 +97,16 @@ const userSchema = new mongoose.Schema(
       type: addressSchema,
       default: () => ({}),
     },
+    loyaltyPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lifetimePoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     wishlist: [
       {
         type: mongoose.Schema.Types.ObjectId,

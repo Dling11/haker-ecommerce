@@ -9,6 +9,8 @@ import {
   confirmPaymongoOrder,
   createOrder,
 } from "../features/orders/orderSlice";
+import { fetchCurrentUser } from "../features/auth/authSlice";
+import api from "../services/api";
 import { getColorOptionLabel } from "../utils/colorOptions";
 import { formatCurrency } from "../utils/formatCurrency";
 
@@ -34,7 +36,12 @@ function CheckoutPage() {
     country: user?.shippingAddress?.country || "Philippines",
     paymentMethod: "cod",
     notes: "",
+    couponCode: "",
+    pointsToRedeem: 0,
   });
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponMessage, setCouponMessage] = useState("");
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const isCheckoutDisabled = settings?.allowCheckout === false;
   const isMaintenanceMode = settings?.maintenanceMode === true;
   const isCodDisabled = settings?.allowCashOnDelivery === false;
@@ -60,6 +67,7 @@ function CheckoutPage() {
       if (confirmPaymongoOrder.fulfilled.match(result)) {
         toast.success("GCash payment confirmed.");
         dispatch(clearLatestOrder());
+        dispatch(fetchCurrentUser());
         setSearchParams({});
         navigate("/shop/orders", { replace: true });
       } else {
@@ -94,11 +102,57 @@ function CheckoutPage() {
     }
   }, [formData.paymentMethod, isCodDisabled, isGCashDisabled]);
 
+  const shippingPrice =
+    Math.max((cart.itemsPrice || 0) - couponDiscount - (formData.pointsToRedeem || 0), 0) >= 3000
+      ? 0
+      : 150;
+  const pointsDiscount =
+    settings?.allowPoints === false
+      ? 0
+      : Math.min(
+          Number(formData.pointsToRedeem || 0) * Number(settings?.pointRedemptionValue || 1),
+          Math.max((cart.itemsPrice || 0) - couponDiscount, 0)
+        );
+  const discountedItemsPrice = Math.max((cart.itemsPrice || 0) - couponDiscount - pointsDiscount, 0);
+  const taxPrice = discountedItemsPrice * 0.02;
+  const orderTotal = discountedItemsPrice + shippingPrice + taxPrice;
+  const estimatedPoints =
+    settings?.allowPoints === false
+      ? 0
+      : Math.floor(discountedItemsPrice / 100) * Number(settings?.pointsEarnRate || 0);
+
   const handleChange = (event) => {
     setFormData((current) => ({
       ...current,
       [event.target.name]: event.target.value,
     }));
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!formData.couponCode.trim()) {
+      toast.error("Enter a coupon code first.");
+      return;
+    }
+
+    try {
+      setIsApplyingCoupon(true);
+      const { data } = await api.get("/coupons/validate", {
+        params: {
+          code: formData.couponCode,
+          subtotal: cart.itemsPrice || 0,
+        },
+      });
+
+      setCouponDiscount(data.discount || 0);
+      setCouponMessage(`${data.coupon.code} applied successfully.`);
+      toast.success("Coupon applied.");
+    } catch (requestError) {
+      setCouponDiscount(0);
+      setCouponMessage("");
+      toast.error(requestError.response?.data?.message || "Failed to apply coupon.");
+    } finally {
+      setIsApplyingCoupon(false);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -117,6 +171,8 @@ function CheckoutPage() {
         },
         paymentMethod: formData.paymentMethod,
         notes: formData.notes,
+        couponCode: formData.couponCode,
+        pointsToRedeem: Number(formData.pointsToRedeem || 0),
       })
     );
 
@@ -128,6 +184,7 @@ function CheckoutPage() {
 
       toast.success("Order placed successfully.");
       dispatch(clearLatestOrder());
+      dispatch(fetchCurrentUser());
       navigate("/shop/orders", { replace: true });
     } else if (createOrder.rejected.match(result)) {
       toast.error(result.payload || "Failed to place order.");
@@ -287,6 +344,69 @@ function CheckoutPage() {
           />
         </label>
 
+        {settings?.allowCoupons !== false ? (
+          <div className="space-y-3 rounded-[10px] border border-violet-100 bg-violet-50/60 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                value={formData.couponCode}
+                onChange={(event) =>
+                  setFormData((current) => ({ ...current, couponCode: event.target.value.toUpperCase() }))
+                }
+                className={checkoutFieldClassName}
+                placeholder="Coupon code"
+              />
+              <button
+                type="button"
+                onClick={handleApplyCoupon}
+                disabled={isApplyingCoupon || !formData.couponCode.trim()}
+                className="rounded-[10px] bg-white px-4 py-3 text-sm font-semibold text-violet-700 disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                {isApplyingCoupon ? "Applying..." : "Apply"}
+              </button>
+            </div>
+            {couponMessage ? <p className="text-sm text-emerald-700">{couponMessage}</p> : null}
+          </div>
+        ) : null}
+
+        {settings?.allowPoints !== false ? (
+          <div className="space-y-3 rounded-[10px] border border-violet-100 bg-violet-50/60 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Redeem points</p>
+                <p className="text-sm text-slate-500">
+                  Available: {user?.loyaltyPoints || 0} points
+                </p>
+              </div>
+              <p className="text-sm font-semibold text-violet-700">
+                1 point = {formatCurrency(Number(settings?.pointRedemptionValue || 1))}
+              </p>
+            </div>
+            <input
+              type="number"
+              min="0"
+              max={user?.loyaltyPoints || 0}
+              value={formData.pointsToRedeem}
+              onChange={(event) =>
+                setFormData((current) => ({
+                  ...current,
+                  pointsToRedeem: Math.max(
+                    0,
+                    Math.min(
+                      Number(event.target.value || 0),
+                      Number(user?.loyaltyPoints || 0),
+                      maxRedeemablePoints
+                    )
+                  ),
+                }))
+              }
+              className={checkoutFieldClassName}
+            />
+            <p className="text-sm text-slate-500">
+              Max usable now: {Math.min(Number(user?.loyaltyPoints || 0), maxRedeemablePoints)} points
+            </p>
+          </div>
+        ) : null}
+
         <button
           type="submit"
           disabled={
@@ -341,17 +461,35 @@ function CheckoutPage() {
             <span>Items</span>
             <span>{formatCurrency(cart.itemsPrice)}</span>
           </div>
+          {couponDiscount > 0 ? (
+            <div className="flex items-center justify-between text-emerald-600">
+              <span>Coupon discount</span>
+              <span>-{formatCurrency(couponDiscount)}</span>
+            </div>
+          ) : null}
+          {pointsDiscount > 0 ? (
+            <div className="flex items-center justify-between text-emerald-600">
+              <span>Points discount</span>
+              <span>-{formatCurrency(pointsDiscount)}</span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between text-slate-600">
             <span>Shipping</span>
-            <span>{cart.itemsPrice >= 3000 ? "Free" : formatCurrency(150)}</span>
+            <span>{shippingPrice === 0 ? "Free" : formatCurrency(shippingPrice)}</span>
           </div>
           <div className="flex items-center justify-between text-slate-600">
             <span>Estimated tax</span>
-            <span>{formatCurrency((cart.itemsPrice || 0) * 0.02)}</span>
+            <span>{formatCurrency(taxPrice)}</span>
           </div>
+          {settings?.allowPoints !== false ? (
+            <div className="flex items-center justify-between text-slate-600">
+              <span>Points after this order</span>
+              <span>+{estimatedPoints}</span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between border-t border-violet-100 pt-4 text-base font-semibold text-slate-900">
             <span>Total</span>
-            <span>{formatCurrency((cart.itemsPrice || 0) + ((cart.itemsPrice || 0) >= 3000 ? 0 : 150) + (cart.itemsPrice || 0) * 0.02)}</span>
+            <span>{formatCurrency(orderTotal)}</span>
           </div>
         </div>
       </aside>
@@ -360,3 +498,10 @@ function CheckoutPage() {
 }
 
 export default CheckoutPage;
+  const maxRedeemablePoints =
+    settings?.allowPoints === false
+      ? 0
+      : Math.floor(
+          Math.max((cart.itemsPrice || 0) - couponDiscount, 0) /
+            Math.max(Number(settings?.pointRedemptionValue || 1), 1)
+        );

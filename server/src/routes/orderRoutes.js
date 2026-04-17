@@ -55,6 +55,8 @@ router.post(
     body("orderItems.*.quantity")
       .isInt({ min: 1 })
       .withMessage("Each order item quantity must be at least 1."),
+    body("orderItems.*.color").optional().isString(),
+    body("orderItems.*.size").optional().isString(),
     body("shippingAddress.fullName").notEmpty().withMessage("Full name is required."),
     body("shippingAddress.phone").notEmpty().withMessage("Phone number is required."),
     body("shippingAddress.street").notEmpty().withMessage("Street is required."),
@@ -97,6 +99,8 @@ router.post(
     body("paymentMethod")
       .isIn(["cod", "gcash"])
       .withMessage("Payment method must be either cod or gcash."),
+    body("couponCode").optional().isString(),
+    body("pointsToRedeem").optional().isInt({ min: 0 }).withMessage("Points to redeem must be zero or greater."),
   ],
   validateRequest,
   createOrder

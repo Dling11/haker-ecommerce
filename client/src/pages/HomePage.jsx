@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Autoplay, Navigation, Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
@@ -17,7 +18,10 @@ import api from "../services/api";
 function HomePage() {
   const dispatch = useDispatch();
   const { items, categories, pagination, isLoading, error } = useSelector((state) => state.products);
+  const { settings } = useSelector((state) => state.site);
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [homepageBanners, setHomepageBanners] = useState([]);
+  const [featuredCollections, setFeaturedCollections] = useState([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const prevButtonRef = useRef(null);
   const nextButtonRef = useRef(null);
@@ -34,19 +38,29 @@ function HomePage() {
     const loadFeaturedProducts = async () => {
       try {
         setFeaturedLoading(true);
-        const { data } = await api.get("/products", {
-          params: {
-            featured: true,
-            limit: 6,
-          },
-        });
+        const [productsResponse, bannersResponse, collectionsResponse] = await Promise.all([
+          api.get("/products", {
+            params: {
+              featured: true,
+              limit: 6,
+            },
+          }),
+          settings?.allowHomepageBanners === false ? Promise.resolve({ data: { banners: [] } }) : api.get("/banners"),
+          settings?.allowCollections === false
+            ? Promise.resolve({ data: { collections: [] } })
+            : api.get("/collections/featured"),
+        ]);
 
         if (isMounted) {
-          setFeaturedProducts(data.products || []);
+          setFeaturedProducts(productsResponse.data.products || []);
+          setHomepageBanners(bannersResponse.data.banners || []);
+          setFeaturedCollections(collectionsResponse.data.collections || []);
         }
       } catch {
         if (isMounted) {
           setFeaturedProducts([]);
+          setHomepageBanners([]);
+          setFeaturedCollections([]);
         }
       } finally {
         if (isMounted) {
@@ -60,7 +74,7 @@ function HomePage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [settings?.allowCollections, settings?.allowHomepageBanners]);
 
   useEffect(() => {
     dispatch(
@@ -127,6 +141,90 @@ function HomePage() {
       </div>
 
       <StatusMessage type="error" message={error} />
+
+      {settings?.allowHomepageBanners !== false && homepageBanners.length ? (
+        <section className="grid gap-4 lg:grid-cols-2">
+          {homepageBanners.slice(0, 2).map((banner) => (
+            <article
+              key={banner._id}
+              className="overflow-hidden rounded-[10px] border border-violet-100 bg-white shadow-soft"
+            >
+              <div className="grid gap-0 md:grid-cols-[1fr_0.9fr]">
+                <div className="space-y-4 p-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-violet-500">
+                    Featured banner
+                  </p>
+                  <h2 className="text-2xl font-black text-slate-900">{banner.title}</h2>
+                  <p className="text-sm leading-6 text-slate-600">{banner.subtitle}</p>
+                  {banner.ctaLink ? (
+                    <Link
+                      to={banner.ctaLink}
+                      className="inline-flex rounded-[10px] bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
+                    >
+                      {banner.ctaLabel || "Shop now"}
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="min-h-[220px] bg-[linear-gradient(180deg,#faf7ff_0%,#f4f8ff_100%)]">
+                  {banner.image?.url ? (
+                    <img
+                      src={banner.image.url}
+                      alt={banner.title}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {settings?.allowCollections !== false && featuredCollections.length ? (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-violet-500">
+                Featured collections
+              </p>
+              <h2 className="mt-2 text-2xl font-black text-slate-900">Browse by curated drop</h2>
+            </div>
+            <Link to="/shop/collections" className="text-sm font-semibold text-violet-700">
+              View all collections
+            </Link>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
+            {featuredCollections.map((collection) => (
+              <Link
+                key={collection._id}
+                to={`/shop/collections/${collection.slug}`}
+                className="overflow-hidden rounded-[10px] border border-violet-100 bg-white shadow-soft transition hover:-translate-y-1"
+              >
+                <div className="aspect-[4/3] bg-[linear-gradient(180deg,#faf7ff_0%,#f4f8ff_100%)]">
+                  {collection.image?.url ? (
+                    <img
+                      src={collection.image.url}
+                      alt={collection.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
+                </div>
+                <div className="space-y-2 p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-black text-slate-900">{collection.name}</h3>
+                    <span className="rounded-[8px] bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                      {collection.productIds?.length || 0}
+                    </span>
+                  </div>
+                  <p className="line-clamp-3 text-sm leading-6 text-slate-600">
+                    {collection.description}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {featuredLoading ? (
         <div className="rounded-[10px] border border-violet-100 bg-white p-8 text-slate-500 shadow-soft">

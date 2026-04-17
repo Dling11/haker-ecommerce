@@ -21,6 +21,13 @@ const defaultForm = {
   allowCashOnDelivery: true,
   allowGCash: true,
   allowReviews: true,
+  allowWishlist: true,
+  allowCoupons: true,
+  allowPoints: true,
+  allowCollections: true,
+  allowHomepageBanners: true,
+  pointsEarnRate: 1,
+  pointRedemptionValue: 1,
 };
 
 function ToggleCard({ title, description, checked, onChange, disabled = false }) {
@@ -69,6 +76,13 @@ function AdminSettingsPage() {
         allowCashOnDelivery: siteSettings.allowCashOnDelivery,
         allowGCash: siteSettings.allowGCash,
         allowReviews: siteSettings.allowReviews,
+        allowWishlist: siteSettings.allowWishlist,
+        allowCoupons: siteSettings.allowCoupons,
+        allowPoints: siteSettings.allowPoints,
+        allowCollections: siteSettings.allowCollections,
+        allowHomepageBanners: siteSettings.allowHomepageBanners,
+        pointsEarnRate: siteSettings.pointsEarnRate ?? 1,
+        pointRedemptionValue: siteSettings.pointRedemptionValue ?? 1,
       });
     }
   }, [siteSettings]);
@@ -252,6 +266,70 @@ function AdminSettingsPage() {
                 checked={formData.allowReviews}
                 onChange={() => handleToggle("allowReviews")}
               />
+              <ToggleCard
+                title="Allow wishlist"
+                description="Let customers save products for later."
+                checked={formData.allowWishlist}
+                onChange={() => handleToggle("allowWishlist")}
+              />
+              <ToggleCard
+                title="Allow coupons"
+                description="Enable promotional coupon codes during checkout."
+                checked={formData.allowCoupons}
+                onChange={() => handleToggle("allowCoupons")}
+              />
+              <ToggleCard
+                title="Allow points"
+                description="Enable loyalty points earning and redemption."
+                checked={formData.allowPoints}
+                onChange={() => handleToggle("allowPoints")}
+              />
+              <ToggleCard
+                title="Allow collections"
+                description="Show curated collection pages and collection browsing."
+                checked={formData.allowCollections}
+                onChange={() => handleToggle("allowCollections")}
+              />
+              <ToggleCard
+                title="Allow homepage banners"
+                description="Show homepage hero banners managed from admin."
+                checked={formData.allowHomepageBanners}
+                onChange={() => handleToggle("allowHomepageBanners")}
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block space-y-2">
+                  <span className="text-sm font-semibold text-white/75">Points earn rate</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.pointsEarnRate}
+                    onChange={(event) =>
+                      setFormData((current) => ({
+                        ...current,
+                        pointsEarnRate: Number(event.target.value),
+                      }))
+                    }
+                    className="field"
+                  />
+                  <p className="text-xs text-white/45">Points earned per every 100 PHP spent.</p>
+                </label>
+                <label className="block space-y-2">
+                  <span className="text-sm font-semibold text-white/75">Point redemption value</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.pointRedemptionValue}
+                    onChange={(event) =>
+                      setFormData((current) => ({
+                        ...current,
+                        pointRedemptionValue: Number(event.target.value),
+                      }))
+                    }
+                    className="field"
+                  />
+                  <p className="text-xs text-white/45">Peso discount value of one redeemed point.</p>
+                </label>
+              </div>
             </div>
           </div>
         </div>

@@ -67,6 +67,13 @@ router.put(
       .withMessage("Cash on Delivery toggle must be true or false."),
     body("allowGCash").optional().isBoolean().withMessage("GCash toggle must be true or false."),
     body("allowReviews").optional().isBoolean().withMessage("Reviews toggle must be true or false."),
+    body("allowWishlist").optional().isBoolean().withMessage("Wishlist toggle must be true or false."),
+    body("allowCoupons").optional().isBoolean().withMessage("Coupons toggle must be true or false."),
+    body("allowPoints").optional().isBoolean().withMessage("Points toggle must be true or false."),
+    body("allowCollections").optional().isBoolean().withMessage("Collections toggle must be true or false."),
+    body("allowHomepageBanners").optional().isBoolean().withMessage("Homepage banners toggle must be true or false."),
+    body("pointsEarnRate").optional().isFloat({ min: 0 }).withMessage("Points earn rate must be zero or greater."),
+    body("pointRedemptionValue").optional().isFloat({ min: 0 }).withMessage("Point redemption value must be zero or greater."),
   ],
   validateRequest,
   updateAdminSiteSettings

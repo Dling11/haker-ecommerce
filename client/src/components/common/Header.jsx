@@ -3,6 +3,7 @@ import { Menu, Transition } from "@headlessui/react";
 import {
   ChevronDown,
   Heart,
+  Layers3,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -23,6 +24,7 @@ function Header() {
   const { user } = useSelector((state) => state.auth);
   const { cart } = useSelector((state) => state.cart);
   const { items: wishlistItems } = useSelector((state) => state.wishlist);
+  const { settings } = useSelector((state) => state.site);
   const [hasAvatarError, setHasAvatarError] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -78,10 +80,7 @@ function Header() {
     <header className="sticky top-0 z-40 border-b border-violet-200/60 bg-[linear-gradient(135deg,#5b43cc_0%,#6f53ef_40%,#8d74ff_100%)] shadow-[0_16px_36px_rgba(91,67,204,0.22)] backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
-          <Link
-            to={user ? getPostLoginPath(user) : "/login"}
-            className="flex items-center gap-3"
-          >
+          <Link to={user ? getPostLoginPath(user) : "/shop"} className="flex items-center gap-3">
             <div>
               <p className="font-display text-lg font-bold tracking-[0.22em] text-white">
                 HAKER
@@ -91,10 +90,19 @@ function Header() {
               </p>
             </div>
           </Link>
+          {settings?.allowCollections !== false ? (
+            <Link
+              to="/shop/collections"
+              className="hidden items-center gap-2 rounded-[10px] px-3 py-2 text-sm font-semibold text-white/85 transition hover:bg-white/10 hover:text-white md:inline-flex"
+            >
+              <Layers3 size={16} />
+              Collections
+            </Link>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3">
-          {user ? (
+          {user && settings?.allowWishlist !== false ? (
             <Link
               to="/shop/wishlist"
               className="relative inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-white/18 bg-white text-violet-700 shadow-sm transition hover:bg-violet-50"
@@ -178,19 +186,21 @@ function Header() {
                       </Menu.Item>
                     ) : null}
 
-                    <Menu.Item>
-                      {({ active }) => (
-                        <Link
-                          to="/shop/wishlist"
-                          className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium ${
-                            active ? "bg-violet-50 text-violet-700" : "text-slate-700"
-                          }`}
-                        >
-                          <Heart size={17} />
-                          Wishlist
-                        </Link>
-                      )}
-                    </Menu.Item>
+                    {settings?.allowWishlist !== false ? (
+                      <Menu.Item>
+                        {({ active }) => (
+                          <Link
+                            to="/shop/wishlist"
+                            className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium ${
+                              active ? "bg-violet-50 text-violet-700" : "text-slate-700"
+                            }`}
+                          >
+                            <Heart size={17} />
+                            Wishlist
+                          </Link>
+                        )}
+                      </Menu.Item>
+                    ) : null}
 
                     <Menu.Item>
                       {({ active }) => (

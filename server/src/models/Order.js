@@ -96,6 +96,35 @@ const orderSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    couponCode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    couponDiscount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsRedeemed: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsDiscount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsEarned: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    pointsGranted: {
+      type: Boolean,
+      default: false,
+    },
     itemsPrice: { type: Number, required: true, min: 0 },
     shippingPrice: { type: Number, required: true, min: 0 },
     taxPrice: { type: Number, required: true, min: 0 },

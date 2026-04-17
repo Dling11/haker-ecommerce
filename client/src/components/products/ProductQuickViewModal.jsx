@@ -389,19 +389,21 @@ function ProductQuickViewModal({ product, isOpen, onClose }) {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleWishlistToggle}
-                  disabled={isWishlistLoading && !isWishlisted}
-                  className={`inline-flex h-12 w-12 items-center justify-center rounded-[10px] border transition ${
-                    isWishlisted
-                      ? "border-rose-200 bg-rose-50 text-rose-500"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:text-rose-500"
-                  }`}
-                  aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-                >
-                  <Heart size={18} className={isWishlisted ? "fill-current" : ""} />
-                </button>
+                {settings?.allowWishlist !== false ? (
+                  <button
+                    type="button"
+                    onClick={handleWishlistToggle}
+                    disabled={isWishlistLoading && !isWishlisted}
+                    className={`inline-flex h-12 w-12 items-center justify-center rounded-[10px] border transition ${
+                      isWishlisted
+                        ? "border-rose-200 bg-rose-50 text-rose-500"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:text-rose-500"
+                    }`}
+                    aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                  >
+                    <Heart size={18} className={isWishlisted ? "fill-current" : ""} />
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={handleAddToCart}

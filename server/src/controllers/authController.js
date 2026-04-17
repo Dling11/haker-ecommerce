@@ -35,6 +35,8 @@ const buildUserPayload = (user) => ({
   phone: user.phone,
   avatar: user.avatar,
   shippingAddress: user.shippingAddress,
+  loyaltyPoints: user.loyaltyPoints,
+  lifetimePoints: user.lifetimePoints,
   createdAt: user.createdAt,
 });
 
