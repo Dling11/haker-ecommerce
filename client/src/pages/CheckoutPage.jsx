@@ -120,6 +120,13 @@ function CheckoutPage() {
     settings?.allowPoints === false
       ? 0
       : Math.floor(discountedItemsPrice / 100) * Number(settings?.pointsEarnRate || 0);
+  const maxRedeemablePoints =
+    settings?.allowPoints === false
+      ? 0
+      : Math.floor(
+          Math.max((cart.itemsPrice || 0) - couponDiscount, 0) /
+            Math.max(Number(settings?.pointRedemptionValue || 1), 1)
+        );
 
   const handleChange = (event) => {
     setFormData((current) => ({
@@ -498,10 +505,3 @@ function CheckoutPage() {
 }
 
 export default CheckoutPage;
-  const maxRedeemablePoints =
-    settings?.allowPoints === false
-      ? 0
-      : Math.floor(
-          Math.max((cart.itemsPrice || 0) - couponDiscount, 0) /
-            Math.max(Number(settings?.pointRedemptionValue || 1), 1)
-        );
