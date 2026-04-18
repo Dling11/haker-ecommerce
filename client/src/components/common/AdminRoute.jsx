@@ -1,8 +1,13 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useSelector } from "react-redux";
+import AuthRoutePending from "./AuthRoutePending";
 
 function AdminRoute() {
-  const { user } = useSelector((state) => state.auth);
+  const { user, token, isInitialized } = useSelector((state) => state.auth);
+
+  if (token && !isInitialized) {
+    return <AuthRoutePending />;
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;
