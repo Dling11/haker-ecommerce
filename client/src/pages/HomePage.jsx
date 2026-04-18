@@ -9,8 +9,10 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 
 import PaginationControls from "../components/common/PaginationControls";
+import HomepageBannerSkeleton from "../components/home/HomepageBannerSkeleton";
 import StatusMessage from "../components/common/StatusMessage";
 import ProductCard from "../components/products/ProductCard";
+import demoHomepageBanners from "../data/demoHomepageBanners";
 import { fetchProducts } from "../features/products/productSlice";
 import useDebouncedValue from "../hooks/useDebouncedValue";
 import api from "../services/api";
@@ -93,92 +95,126 @@ function HomePage() {
     }));
   };
 
+  const displayBanners =
+    settings?.allowHomepageBanners === false
+      ? []
+      : featuredLoading
+        ? []
+      : homepageBanners.length
+        ? homepageBanners
+        : demoHomepageBanners;
+  const heroBannerCount = Math.min(displayBanners.length, 3);
+  const shouldShowBannerSkeleton =
+    settings?.allowHomepageBanners !== false && featuredLoading;
+
   return (
     <section className="space-y-10">
-      <div className="rounded-[10px] border border-violet-100 bg-[linear-gradient(135deg,#f7f3ff_0%,#ffffff_48%,#f4f7ff_100%)] p-8 shadow-soft">
-        <div className="space-y-6">
-          <span className="inline-flex rounded-[8px] bg-violet-100 px-4 py-2 text-sm font-semibold text-violet-700">
-            Haker Storefront
-          </span>
-
-          <div className="space-y-4">
-            <h1 className="max-w-2xl text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
-              Clean product browsing with a lighter storefront and faster path to checkout.
-            </h1>
-            <p className="max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-              Browse the catalog, filter by category, and move through your purchase
-              flow with a cleaner, more modern shopping experience.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-[10px] border border-violet-100 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-violet-500">
-                Curated
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Product cards are structured for quick scanning and clearer actions.
-              </p>
-            </div>
-            <div className="rounded-[10px] border border-violet-100 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-violet-500">
-                Fast
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Add to cart opens the side drawer immediately so users stay in flow.
-              </p>
-            </div>
-            <div className="rounded-[10px] border border-violet-100 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-violet-500">
-                Guided
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Checkout and order states are easier to read with stronger hierarchy.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <StatusMessage type="error" message={error} />
 
-      {settings?.allowHomepageBanners !== false && homepageBanners.length ? (
-        <section className="grid gap-4 lg:grid-cols-2">
-          {homepageBanners.slice(0, 2).map((banner) => (
+      {shouldShowBannerSkeleton ? (
+        <HomepageBannerSkeleton />
+      ) : displayBanners.length ? (
+        <section
+          className={`grid gap-4 ${
+            heroBannerCount === 1
+              ? "grid-cols-1"
+              : heroBannerCount === 2
+                ? "grid-cols-1 md:grid-cols-2"
+                : "grid-cols-1 lg:grid-cols-2 lg:grid-rows-2"
+          }`}
+        >
+          {displayBanners.slice(0, 3).map((banner, index) => (
             <article
               key={banner._id}
-              className="overflow-hidden rounded-[10px] border border-violet-100 bg-white shadow-soft"
+              className={`group relative overflow-hidden rounded-[10px] border border-slate-200/70 bg-slate-900 shadow-soft ${
+                heroBannerCount === 1
+                  ? "col-span-1"
+                  : heroBannerCount === 2
+                    ? "col-span-1"
+                    : index === 0
+                      ? "lg:row-span-2"
+                      : "lg:col-span-1"
+              }`}
             >
-              <div className="grid gap-0 md:grid-cols-[1fr_0.9fr]">
-                <div className="space-y-4 p-6">
-                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-violet-500">
-                    Featured banner
+              <div
+                className={`absolute inset-0 ${
+                  heroBannerCount === 1
+                    ? "min-h-[420px] sm:min-h-[500px]"
+                    : heroBannerCount === 2
+                      ? "min-h-[300px] sm:min-h-[360px]"
+                      : index === 0
+                        ? "min-h-[360px] sm:min-h-[420px] lg:min-h-[656px]"
+                        : "min-h-[280px] sm:min-h-[320px]"
+                }`}
+              >
+                {banner.image?.url ? (
+                  <img
+                    src={banner.image.url}
+                    alt={banner.title}
+                    className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-[linear-gradient(135deg,#f3e8ff_0%,#f8fafc_48%,#dbeafe_100%)]" />
+                )}
+                <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(15,23,42,0.82)_0%,rgba(15,23,42,0.55)_34%,rgba(15,23,42,0.18)_62%,rgba(15,23,42,0.1)_100%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_38%)]" />
+              </div>
+
+              <div
+                className={`relative flex h-full flex-col justify-end p-6 sm:p-7 ${
+                  heroBannerCount === 1
+                    ? "min-h-[420px] sm:min-h-[500px]"
+                    : heroBannerCount === 2
+                      ? "min-h-[300px] sm:min-h-[360px]"
+                      : index === 0
+                        ? "min-h-[360px] sm:min-h-[420px] lg:min-h-[656px]"
+                        : "min-h-[280px] sm:min-h-[320px]"
+                }`}
+              >
+                <div className="max-w-[26rem] space-y-4">
+                  <p className="inline-flex rounded-full border border-violet-200/70 bg-violet-100/95 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-violet-900 shadow-sm backdrop-blur-sm">
+                    {banner.tone || "Featured"}
                   </p>
-                  <h2 className="text-2xl font-black text-slate-900">{banner.title}</h2>
-                  <p className="text-sm leading-6 text-slate-600">{banner.subtitle}</p>
+                  <h2
+                    className={`font-black tracking-tight text-white ${
+                      heroBannerCount === 1
+                        ? "text-4xl sm:text-5xl"
+                        : heroBannerCount === 2 || index === 0
+                          ? "text-3xl sm:text-4xl"
+                        : "text-2xl"
+                    }`}
+                  >
+                    {banner.title}
+                  </h2>
+                  <p className="max-w-xl text-sm leading-6 text-white/80">{banner.subtitle}</p>
                   {banner.ctaLink ? (
                     <Link
                       to={banner.ctaLink}
-                      className="inline-flex rounded-[10px] bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
+                      className="inline-flex w-fit rounded-[10px] border border-white/20 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white/90"
                     >
                       {banner.ctaLabel || "Shop now"}
                     </Link>
-                  ) : null}
-                </div>
-                <div className="min-h-[220px] bg-[linear-gradient(180deg,#faf7ff_0%,#f4f8ff_100%)]">
-                  {banner.image?.url ? (
-                    <img
-                      src={banner.image.url}
-                      alt={banner.title}
-                      className="h-full w-full object-cover"
-                    />
                   ) : null}
                 </div>
               </div>
             </article>
           ))}
         </section>
-      ) : null}
+      ) : (
+        <div className="rounded-[10px] border border-violet-100 bg-[linear-gradient(135deg,#f7f3ff_0%,#ffffff_48%,#f4f7ff_100%)] p-8 shadow-soft">
+          <div className="space-y-4">
+            <p className="text-sm font-semibold uppercase tracking-[0.25em] text-violet-500">
+              New arrivals
+            </p>
+            <h1 className="max-w-2xl text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
+              Fresh pieces, cleaner browsing, and a faster path to checkout.
+            </h1>
+            <p className="max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+              Use banners from admin to turn this hero area into a stronger merchandising space.
+            </p>
+          </div>
+        </div>
+      )}
 
       {settings?.allowCollections !== false && featuredCollections.length ? (
         <section className="space-y-4">
