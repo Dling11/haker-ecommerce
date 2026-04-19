@@ -1,12 +1,10 @@
 import { Outlet } from "react-router-dom";
 
-import AppBootstrap from "../components/common/AppBootstrap";
 import hackerAnonymousImage from "../assets/hacker-annonymous.png";
 
 function AuthLayout() {
   return (
     <div className="min-h-screen bg-[#090b0f] text-white">
-      <AppBootstrap />
       <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
         <section className="relative hidden overflow-hidden lg:flex">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(34,211,238,0.12),transparent_24%),radial-gradient(circle_at_85%_20%,rgba(59,130,246,0.1),transparent_28%),radial-gradient(circle_at_50%_100%,rgba(255,255,255,0.05),transparent_32%),linear-gradient(145deg,#06080b_0%,#0b0f14_45%,#05070a_100%)]" />

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 
 import AdminRoute from "./components/common/AdminRoute";
+import AppBootstrap from "./components/common/AppBootstrap";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicOnlyRoute from "./components/common/PublicOnlyRoute";
 import RootRedirect from "./components/common/RootRedirect";
@@ -43,6 +44,7 @@ function AppFallback() {
 function App() {
   return (
     <Suspense fallback={<AppFallback />}>
+      <AppBootstrap />
       <Routes>
       <Route path="/" element={<RootRedirect />} />
 
